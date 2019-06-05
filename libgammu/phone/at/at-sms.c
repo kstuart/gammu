@@ -29,6 +29,7 @@
 #include "../../gsmphones.h"
 #include "../../misc/coding/coding.h"
 #include "../../service/gsmpbk.h"
+#include "../../cdma.h"
 #include "../pfunc.h"
 
 #include "atgen.h"
@@ -567,7 +568,13 @@ GSM_Error ATGEN_DecodePDUMessage(GSM_StateMachine *s, const char *PDU, const int
 	}
 
 	/* Decode PDU */
-	error = GSM_DecodePDUFrame(&(s->di), sms,  buffer, length, &parse_len, TRUE);
+	switch (s->CurrentConfig->NetworkType) {
+    case NETWORK_CDMA:
+      error = ATCDMA_DecodePDUFrame(&(s->di), sms,  buffer, length, &parse_len);
+      break;
+    default:
+      error = GSM_DecodePDUFrame(&(s->di), sms,  buffer, length, &parse_len, TRUE);
+	}
 
 	if (error != ERR_NONE) {
 		free(buffer);
@@ -1719,9 +1726,15 @@ GSM_Error ATGEN_MakeSMSFrame(GSM_StateMachine *s, GSM_SMSMessage *message, unsig
 			smprintf(s, "SMS Submit\n");
 			error = PHONE_EncodeSMSFrame(s,message,buffer,PHONE_SMSSubmit,&length,TRUE);
 
-			if (error != ERR_NONE) {
+			if (error != ERR_NONE)
+			  return error;
+
+		  if(s->CurrentConfig->NetworkType == NETWORK_CDMA) {
+		    EncodeHexBin(hexreq, buffer, length);
+		    *length2 = length * 2;
 				return error;
 			}
+
 			length = length - PHONE_SMSSubmit.Text;
 
 			for (i = 0;i < buffer[PHONE_SMSSubmit.SMSCNumber]+1;i++) {

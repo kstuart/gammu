@@ -26,6 +26,7 @@ MACRO(smsd_test TEST_NAME)
 ENDMACRO(smsd_test)
 
 configure_file(smsd.cfg.in ${PROJECT_BINARY_DIR}/smsd.cfg)
+configure_file(smsd-cdma.cfg.in ${PROJECT_BINARY_DIR}/smsd-cdma.cfg)
 
 add_custom_command(TARGET atgen-tests POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/inbox
@@ -48,3 +49,8 @@ smsd_test(test_sql_time)
 smsd_test(smsd-incoming-cds)
 smsd_test(smsd-cancel-call)
 smsd_test(smsd-incoming-ussd)
+
+# 3GPP2 (CDMA)
+smsd_test(at-cdma-cmgr)
+smsd_test(at-cdma-cmgl)
+smsd_test(at-cdma-sendsms)

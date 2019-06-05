@@ -987,6 +987,7 @@ GSM_PhoneModel allmodels[] = {
 	/* Telit */
 	{"HE910-D",	"HE910-D",	"",		{F_USSD_GSM_CHARSET, 0}},
 	{"HE910",	"HE910",	"",		{F_USSD_GSM_CHARSET, 0}},
+  {"LM940",	"LM940",	"",		{F_NETWORK_CDMA, 0}},
 
 	/* ZTE */
 	{"MF100",	"MF100",	"",		{F_ZTE_INIT, 0}},

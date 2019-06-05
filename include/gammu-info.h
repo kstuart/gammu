@@ -737,6 +737,10 @@ typedef enum {
 	 * Phone does not have a SR memory even if it reports so.
 	 */
 	F_SMS_NO_SR,
+	/**
+	 * Indicates device uses the 3GPP2 CDMA Standard.
+	 */
+	F_NETWORK_CDMA,
 
 	/**
 	 * Just marker of highest feature code, should not be used.

@@ -9,6 +9,7 @@
 #include "../misc/coding/coding.h"
 #include "../misc/locales.h"
 #include "../service/gsmring.h"
+#include "../cdma.h"
 
 /* These SMS layouts are used exactly as written in Nokia DCT3 phones.
  * In AT module(s) we have to use some layouts to convert AT frame to format
@@ -73,6 +74,10 @@ GSM_Error PHONE_EncodeSMSFrame(GSM_StateMachine *s, GSM_SMSMessage *SMS, unsigne
 			return ERR_EMPTYSMSC;
 		}
 	}
+
+	if(s->CurrentConfig->NetworkType == NETWORK_CDMA)
+    return ATCDMA_EncodePDUFrame(GSM_GetDI(s), SMS, buffer, length);
+
 	return GSM_EncodeSMSFrame(GSM_GetDI(s), SMS, buffer, Layout, length, clear);
 }
 
