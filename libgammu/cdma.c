@@ -162,6 +162,9 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
   SMS->Encoding = buffer[pos++];
   smfprintf(di, "Encoding: [%d] %s\n", SMS->Encoding, CDMA_SMSEncodingToString(SMS->Encoding));
 
+  // TODO: [KS] Map encodings to GSM
+  SMS->Coding = SMS_Coding_Default_No_Compression;
+
   udh = buffer[pos++];
   smfprintf(di, "UDH Present: %s\n", udh == 0 ? "No" : "Yes");
 
@@ -199,7 +202,10 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   len = GSM_PackSemiOctetNumber(SMS->Number, buffer + 1, FALSE);
   *buffer = len;
   *length += len + 1;
-  smfprintf(di, "Recipient number: \"%s\"\n", DecodeUnicodeString(SMS->Number));
+  smfprintf(di, "Destination number: \"%s\"\n", DecodeUnicodeString(SMS->Number));
+
+  // TODO: [KS] Find out where callback number should come from
+  EncodeUnicode(SMS->OtherNumbers[0], "01148574226146", 14);
 
   len = GSM_PackSemiOctetNumber(SMS->OtherNumbers[0], buffer + *length + 1, FALSE);
   *(buffer + *length) = len;
@@ -225,22 +231,6 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   DumpMessageText(di, SMS->Text, SMS->Length);
 
   *length += SMS->Length;
-
-  return error;
-}
-
-GSM_Error ATCDMA_SendSMS(GSM_StateMachine *s, GSM_SMSMessage *sms)
-{
-  GSM_Error error;
-
-  assert(s->Phone.Data.Priv.ATGEN.SMSMode == SMS_AT_PDU);
-
-  if(sms->PDU == SMS_Deliver) {
-    sms->PDU = SMS_Submit;
-    smprintf(s, "PDU type changed from SM-Deliver to SM-Submit\n");
-  }
-
-
 
   return error;
 }
