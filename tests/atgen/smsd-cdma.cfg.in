@@ -2,7 +2,7 @@
 connection=at
 logformat=textall
 networktype=cdma
-phonenumber=01148609200534
+phonenumber=01942205348609
 
 [smsd]
 #logfile=${PROJECT_BINARY_DIR}/smsd.log

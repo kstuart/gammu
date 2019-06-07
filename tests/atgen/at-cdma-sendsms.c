@@ -40,10 +40,9 @@ int main(void)
   config->Status = &status;
 
   memset(&msms, 0, sizeof(msms));
-
   char msg[] = "aaaaaaaaaabbbbbbbbbb";
 
-  EncodeUnicode(sms->Number, "01194356453", 11);
+  EncodeUnicode(sms->Number, "01248347480534", 13);
   EncodeUnicode(sms->Text, msg, strlen(msg));
   sms->Length = UnicodeLength(sms->Text);
   sms->PDU = SMS_Submit;
