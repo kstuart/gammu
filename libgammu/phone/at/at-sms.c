@@ -2056,6 +2056,10 @@ GSM_Error ATGEN_SendSMS(GSM_StateMachine *s, GSM_SMSMessage *sms)
 	size_t length = 0;
 	size_t len;
 
+	assert(sms->OtherNumbersNum == 0);
+	strncpy(sms->OtherNumbers[0], s->CurrentConfig->PhoneNumber, GSM_MAX_NUMBER_LENGTH);
+	sms->OtherNumbersNum++;
+
 	if (sms->PDU == SMS_Deliver) {
 		sms->PDU = SMS_Submit;
 	}

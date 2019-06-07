@@ -153,9 +153,6 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
       SMS->Coding = SMS_Coding_ASCII;
       pos += Decode7bitASCII(output, buffer + pos, datalength);
       EncodeUnicode(SMS->Text, output, datalength);
-#ifdef DEBUG
-      DumpMessageText(&GSM_global_debug, SMS->Text, datalength * 2);
-#endif
       break;
     case SMS_ENC_GSM:
       SMS->Coding = SMS_Coding_Default_No_Compression;
@@ -166,6 +163,7 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
       SMS->Coding = SMS_Coding_8bit;
       memcpy(output, buffer + pos, datalength);
       pos += datalength;
+      EncodeUnicode(SMS->Text, output, datalength);
       break;
     default:
       smfprintf(di, "Unsupported encoding.\n");
@@ -176,6 +174,11 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
     return error;
 
   SMS->Length = datalength;
+
+#ifdef DEBUG
+  if(encoding != SMS_ENC_GSM)
+    DumpMessageText(&GSM_global_debug, SMS->Text, SMS->Length * 2);
+#endif
 
   if (final_pos)
     *final_pos = pos;
@@ -196,10 +199,10 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   *length += len + 1;
   smfprintf(di, "Destination Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
 
-  len = GSM_PackSemiOctetNumber(SMS->SMSC.Number, buffer + *length + 1, FALSE);
+  len = GSM_PackSemiOctetNumber(SMS->OtherNumbers[0], buffer + *length + 1, FALSE);
   *(buffer + *length) = len;
   *length += len + 1;
-  smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->SMSC.Number));
+  smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[0]));
 
   *((unsigned short*)&buffer[*length]) = htons(TELESERVICE_ID_SMS);
   *length += 2;

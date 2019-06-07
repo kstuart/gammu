@@ -129,7 +129,7 @@ CREATE TABLE outbox (
   "Status" varchar(255) NOT NULL DEFAULT 'Reserved',
   "StatusCode" integer NOT NULL DEFAULT '-1',
   CHECK ("Coding" IN 
-  ('Default_No_Compression','Unicode_No_Compression','8bit','Default_Compression','Unicode_Compression')),
+  ('Default_No_Compression','Unicode_No_Compression','8bit','Default_Compression','Unicode_Compression', '7bit_ASCII')),
   CHECK ("DeliveryReport" IN ('default','yes','no')),
   CHECK ("Status" IN 
   ('SendingOK','SendingOKNoReport','SendingError','DeliveryOK','DeliveryFailed','DeliveryPending',

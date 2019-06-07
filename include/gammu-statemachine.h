@@ -123,6 +123,10 @@ typedef struct {
    * supported options are GSM and CDMA.
    */
   NETWORK_TYPE NetworkType;
+  /**
+   * Phone number associated with the device.
+   */
+   char PhoneNumber[GSM_MAX_NUMBER_LENGTH];
 } GSM_Config;
 
 /**
