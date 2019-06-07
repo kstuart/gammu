@@ -1,117 +1,25 @@
 #include <gammu-statemachine.h>
 #include <gammu.h>
-#include "cdma.h"
 #include "misc/coding/coding.h"
 #include "debug.h"
 #include "gsmstate.h"
 
-#include <math.h>
+#include "bitstream.h"
+#include "cdma.h"
+
 #include <assert.h>
 #include <netinet/in.h>
 
-typedef struct {
-  unsigned char* stream;
-  int stream_pos;
-  unsigned int nibbler;
-  int nibbler_len;
-} BitStream;
-
-typedef BitStream BitReader;
-typedef BitStream BitWriter;
-
-typedef BitReader *BITREADER;
-typedef BitWriter *BITWRITER;
-
-void BitReader_SetStart(BITREADER reader, unsigned char *buffer)
+int Decode7bitASCII(char *dest, const unsigned char *src, int src_length)
 {
-  assert(reader != NULL);
-  assert(buffer != NULL);
+  BitReader reader;
+  int i;
 
-  reader->stream = buffer;
-  reader->stream_pos = 0;
-  reader->nibbler = 0;
-  reader->nibbler_len = 0;
-}
+  BitReader_SetStart(&reader, src);
+  for(i = 0; i < src_length; i++)
+    dest[i] = BitReader_ReadBits(&reader, 7);
 
-unsigned int BitReader_ReadBits(BITREADER reader, int length)
-{
-  int i = 0;
-  int bytesToRead = 0;
-  unsigned bitOffset = 0;
-  unsigned resultMask = (1 << length) - 1;
-  unsigned int result = 0;
-
-  if (length > reader->nibbler_len) {
-    bytesToRead = ceil(((double)length - reader->nibbler_len) / 8);
-    for (i = 0; i < bytesToRead; i++) {
-      reader->nibbler = (reader->nibbler << 8) | (reader->stream[reader->stream_pos++] & 0xFF);
-      reader->nibbler_len += 8;
-    }
-  }
-
-  bitOffset = reader->nibbler_len - length;
-  result = (reader->nibbler >> bitOffset) & resultMask;
-  reader->nibbler_len -= length;
-
-  return result;
-}
-
-int BitReader_GetPosition(BITREADER reader)
-{
-  return reader->stream_pos;
-}
-
-void BitWriter_SetStart(BITWRITER writer, unsigned char *buffer)
-{
-  assert(writer != NULL);
-  assert(buffer != NULL);
-
-  writer->stream = buffer;
-  writer->stream_pos = 0;
-  writer->nibbler = 0;
-  writer->nibbler_len = 0;
-}
-
-void BitWriter_WriteBits(BITWRITER writer, unsigned int value, int length)
-{
-  unsigned value_mask = (1 << length) - 1;
-  int merge_length = 8 - writer->nibbler_len;
-  int total_length = length + writer->nibbler_len;
-
-  if(total_length < 8) {
-    writer->nibbler = (writer->nibbler << length) | (value & value_mask);
-    writer->nibbler_len += length;
-    return;
-  }
-
-  if(writer->nibbler_len) {
-    value_mask = (1 << merge_length) -1;
-    writer->nibbler = (writer->nibbler << merge_length) | ((value >> (length - merge_length)) & value_mask);
-    writer->stream[writer->stream_pos++] = writer->nibbler & 0xFF;
-    length -= merge_length;
-  }
-
-  while(length >= 8) {
-    length -= 8;
-    writer->stream[writer->stream_pos++] = (value >> length) & 0xFF;
-  }
-
-  writer->nibbler = value & ((1 << length) - 1);
-  writer->nibbler_len = length;
-}
-
-void BitWriter_Flush(BITWRITER writer)
-{
-  if(writer->nibbler_len)
-    writer->stream[writer->stream_pos++] = writer->nibbler << (8 - writer->nibbler_len);
-
-  writer->nibbler = 0;
-  writer->nibbler_len = 0;
-}
-
-int BitWriter_GetPosition(BITWRITER writer)
-{
-  return writer->stream_pos;
+  return BitReader_GetPosition(&reader);
 }
 
 int Encode7bitASCII(unsigned char *dest, const char *src, int src_length)
@@ -120,9 +28,9 @@ int Encode7bitASCII(unsigned char *dest, const char *src, int src_length)
   int i;
 
   BitWriter_SetStart(&writer, dest);
-  for(i = 0; i < src_length; i++) {
+  for(i = 0; i < src_length; i++)
     BitWriter_WriteBits(&writer, src[i], 7);
-  }
+
   BitWriter_Flush(&writer);
   return BitWriter_GetPosition(&writer);
 }
@@ -140,7 +48,7 @@ GSM_Error CDMA_CheckTeleserviceID(GSM_Debug_Info *di, const unsigned char *pos, 
     smfprintf(di, "Invalid Teleservice ID parameter length, expected 2 but given %d\n", length);
     return ERR_CORRUPTED;
   }
-  teleservice_id = ((*(unsigned short*)pos >> 8) & 0xff) | (*(unsigned short*)pos & 0xff) << 8;
+  teleservice_id = ntohs(*(unsigned short*)pos);
 
   if(teleservice_id != 4098) {
     smfprintf(di, "Unsupported teleservice identifier: %d\n", teleservice_id);
@@ -178,19 +86,17 @@ GSM_Error ATCDMA_DecodeSMSDateTime(GSM_Debug_Info *di, GSM_DateTime *DT, const u
   return ERR_NONE;
 }
 
-GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *buffer, size_t length, size_t *final_pos)
-{
+GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *buffer, size_t length, size_t *final_pos) {
   int udh = 0;
   size_t pos = 0;
   int datalength = 0;
   unsigned char output[161];
-  int out_pos = 0;
+  SMS_ENCODING encoding;
   GSM_Error error;
-  BitReader reader;
 
   GSM_SetDefaultReceivedSMSData(SMS);
 
-  if(SMS->State == SMS_Read || SMS->State == SMS_UnRead) {
+  if (SMS->State == SMS_Read || SMS->State == SMS_UnRead) {
     smfprintf(di, "SMS type: Deliver\n");
     SMS->PDU = SMS_Deliver;
   } else {
@@ -199,22 +105,21 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
   }
 
   error = GSM_UnpackSemiOctetNumber(di, SMS->Number, buffer, &pos, length, FALSE);
-  if(error != ERR_NONE)
+  if (error != ERR_NONE)
     return error;
 
-  if(SMS->PDU == SMS_Submit) {
+  if (SMS->PDU == SMS_Submit) {
     error = GSM_UnpackSemiOctetNumber(di, SMS->OtherNumbers[0], buffer, &pos, length, FALSE);
-    if(error != ERR_NONE)
+    if (error != ERR_NONE)
       return error;
 
-    smfprintf(di, "Destination Address: \"%s\"\n",DecodeUnicodeString(SMS->Number));
-    smfprintf(di, "Callback Address: \"%s\"\n",DecodeUnicodeString(SMS->OtherNumbers[0]));
+    smfprintf(di, "Destination Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
+    smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[0]));
+  } else {
+    smfprintf(di, "Originating Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
   }
-  else
-    smfprintf(di, "Originating Address: \"%s\"\n",DecodeUnicodeString(SMS->Number));
 
-
-  if(SMS->PDU == SMS_Deliver) {
+  if (SMS->PDU == SMS_Deliver) {
     error = ATCDMA_DecodeSMSDateTime(di, &SMS->DateTime, buffer + pos);
     pos += 6;
     if (error != ERR_NONE)
@@ -223,42 +128,56 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
 
   error = CDMA_CheckTeleserviceID(di, buffer + pos, 2);
   pos += 2;
-  if(error != ERR_NONE)
+  if (error != ERR_NONE)
     return error;
 
+  // TODO: [KS] How to map priorities?
   SMS->Priority = buffer[pos++];
   smfprintf(di, "Priority: [%d] %s\n", SMS->Priority, CDMA_SMSPriorityToString(SMS->Priority));
 
-  SMS->Encoding = buffer[pos++];
-  smfprintf(di, "Encoding: [%d] %s\n", SMS->Encoding, CDMA_SMSEncodingToString(SMS->Encoding));
-
-  // TODO: [KS] Map encodings to GSM
-  SMS->Coding = SMS_Coding_Default_No_Compression;
+  encoding = buffer[pos++];
+  smfprintf(di, "Encoding: [%d] %s\n", encoding, CDMA_SMSEncodingToString(encoding));
 
   udh = buffer[pos++];
   smfprintf(di, "UDH Present: %s\n", udh == 0 ? "No" : "Yes");
+  if (udh != 0) {
+    smfprintf(di, "UDH not currently supported.\n");
+    return ERR_ABORTED;
+  }
 
   datalength = buffer[pos++];
   smfprintf(di, "Data length: %d\n", datalength);
 
-  switch(SMS->Encoding) {
+  switch (encoding) {
     case SMS_ENC_ASCII:
-      BitReader_SetStart(&reader, buffer + pos);
-      for(out_pos = 0; out_pos < datalength; out_pos++)
-        output[out_pos] = BitReader_ReadBits(&reader, 7);
-      pos += BitReader_GetPosition(&reader);
+      SMS->Coding = SMS_Coding_ASCII;
+      pos += Decode7bitASCII(output, buffer + pos, datalength);
+      EncodeUnicode(SMS->Text, output, datalength);
+#ifdef DEBUG
+      DumpMessageText(&GSM_global_debug, SMS->Text, datalength * 2);
+#endif
       break;
-
+    case SMS_ENC_GSM:
+      SMS->Coding = SMS_Coding_Default_No_Compression;
+      pos += Decode7bitASCII(output, buffer + pos, datalength);
+      DecodeDefault(SMS->Text, output, SMS->Length, TRUE, NULL);
+      break;
     case SMS_ENC_OCTET:
+      SMS->Coding = SMS_Coding_8bit;
       memcpy(output, buffer + pos, datalength);
       pos += datalength;
       break;
+    default:
+      smfprintf(di, "Unsupported encoding.\n");
+      error = ERR_ABORTED;
   }
 
-  SMS->Length = datalength;
-  DecodeDefault(SMS->Text, output, SMS->Length, TRUE, NULL);
+  if (error != ERR_NONE)
+    return error;
 
-  if(final_pos)
+  SMS->Length = datalength;
+
+  if (final_pos)
     *final_pos = pos;
 
   return error;
@@ -275,12 +194,12 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   len = GSM_PackSemiOctetNumber(SMS->Number, buffer + 1, FALSE);
   *buffer = len;
   *length += len + 1;
-  smfprintf(di, "Destination number: \"%s\"\n", DecodeUnicodeString(SMS->Number));
+  smfprintf(di, "Destination Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
 
   len = GSM_PackSemiOctetNumber(SMS->SMSC.Number, buffer + *length + 1, FALSE);
   *(buffer + *length) = len;
   *length += len + 1;
-  smfprintf(di, "Callback number: \"%s\"\n", DecodeUnicodeString(SMS->SMSC.Number));
+  smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->SMSC.Number));
 
   *((unsigned short*)&buffer[*length]) = htons(TELESERVICE_ID_SMS);
   *length += 2;

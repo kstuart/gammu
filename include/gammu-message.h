@@ -464,18 +464,6 @@ typedef enum  {
 } SMS_PRIORITY;
 
 /**
- * CDMA SMS Encoding
- *
- * \ingroup SMS
- */
-typedef enum {
-  SMS_ENC_OCTET = 0,
-  SMS_ENC_ASCII = 2,
-  SMS_ENC_UNICODE = 4,
-  SMS_ENC_GSM = 9
-} SMS_ENCODING;
-
-/**
  * SMS message data.
  *
  * \ingroup SMS
@@ -574,10 +562,6 @@ typedef struct {
 	 * CDMA SMS Priority
 	 */
 	SMS_PRIORITY Priority;
-	/**
-	 * CDMA SMS Encoding
-	 */
-	SMS_ENCODING Encoding;
 } GSM_SMSMessage;
 
 /* In layouts are saved locations for some SMS part. Below are listed

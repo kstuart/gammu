@@ -7,6 +7,18 @@
 extern "C" {
 #endif
 
+/**
+ * CDMA SMS Encoding
+ *
+ * \ingroup SMS
+ */
+typedef enum {
+  SMS_ENC_OCTET = 0,
+  SMS_ENC_ASCII = 2,
+  SMS_ENC_UNICODE = 4,
+  SMS_ENC_GSM = 9
+} SMS_ENCODING;
+
 typedef enum {
   CDMA_MSG_TYPE_P2P = 0,
   CDMA_MSG_TYPE_BCAST = 1,

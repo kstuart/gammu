@@ -47,6 +47,8 @@ int main(void)
 
   error = ATGEN_GetSMS(s, &msms);
   test_result(error == ERR_NONE);
+  test_result(sms->Length == 4);
+  test_result(sms->Coding == SMS_Coding_ASCII);
   test_result(strcmp("test", DecodeUnicodeString(sms->Text)) == 0);
 
   cleanup_state_machine(s);
