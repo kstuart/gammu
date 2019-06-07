@@ -280,7 +280,7 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   len = GSM_PackSemiOctetNumber(SMS->SMSC.Number, buffer + *length + 1, FALSE);
   *(buffer + *length) = len;
   *length += len + 1;
-  smfprintf(di, "Callback number: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[0]));
+  smfprintf(di, "Callback number: \"%s\"\n", DecodeUnicodeString(SMS->SMSC.Number));
 
   *((unsigned short*)&buffer[*length]) = htons(TELESERVICE_ID_SMS);
   *length += 2;
