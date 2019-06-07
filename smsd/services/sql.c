@@ -28,6 +28,7 @@
 #endif
 
 #include "../core.h"
+#include "../../libgammu/gsmstate.h"
 #include "../../libgammu/misc/string.h"
 
 /**
@@ -1044,7 +1045,10 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		if (sms->SMS[sms->Number].Coding == 0) {
 			if (text == NULL || text_len == 0) {
 				SMSD_Log(DEBUG_NOTICE, Config, "Assuming default coding for text message");
-				sms->SMS[sms->Number].Coding = SMS_Coding_Default_No_Compression;
+				sms->SMS[sms->Number].Coding =
+				  Config->gsm->CurrentConfig->NetworkType == NETWORK_CDMA ?
+    			  SMS_Coding_ASCII :
+		  		  SMS_Coding_Default_No_Compression;
 			} else {
 				SMSD_Log(DEBUG_NOTICE, Config, "Assuming 8bit coding for binary message");
 				sms->SMS[sms->Number].Coding = SMS_Coding_8bit;

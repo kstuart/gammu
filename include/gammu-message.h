@@ -327,7 +327,11 @@ typedef enum {
 	/**
 	 * 8-bit.
 	 */
-	SMS_Coding_8bit
+	SMS_Coding_8bit,
+	/**
+	 * CDMA 7-bit ASCII
+	 */
+	SMS_Coding_ASCII
 } GSM_Coding_Type;
 
 /**

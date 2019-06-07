@@ -1289,6 +1289,8 @@ GSM_Coding_Type GSM_StringToSMSCoding(const char *s)
 		return SMS_Coding_Default_Compression;
 	} else if (strcmp("8bit", s) == 0) {
 		return SMS_Coding_8bit;
+  } else if (strcmp("7bit_ASCII", s) == 0) {
+    return SMS_Coding_ASCII;
 	}
 
 	return 0;
@@ -1307,11 +1309,13 @@ const char *GSM_SMSCodingToString(GSM_Coding_Type type)
 			return "Default_Compression";
 		case SMS_Coding_8bit:
 			return "8bit";
+	  case SMS_Coding_ASCII:
+	    return "7bit_ASCII";
+	  default:
+      return NULL;
 	}
-
-	return NULL;
 }
 
-/* How should editor hadle tabs in this file? Add editor commands here.
+/* How should editor handle tabs in this file? Add editor commands here.
  * vim: noexpandtab sw=8 ts=8 sts=8:
  */

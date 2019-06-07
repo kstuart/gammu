@@ -10,15 +10,19 @@
 #include <netinet/in.h>
 
 typedef struct {
-  const unsigned char* stream;
+  unsigned char* stream;
   int stream_pos;
   unsigned int nibbler;
   int nibbler_len;
-} BitReader;
+} BitStream;
+
+typedef BitStream BitReader;
+typedef BitStream BitWriter;
 
 typedef BitReader *BITREADER;
+typedef BitWriter *BITWRITER;
 
-void BitReader_SetStart(BITREADER reader, const unsigned char *buffer)
+void BitReader_SetStart(BITREADER reader, unsigned char *buffer)
 {
   assert(reader != NULL);
   assert(buffer != NULL);
@@ -55,6 +59,72 @@ unsigned int BitReader_ReadBits(BITREADER reader, int length)
 int BitReader_GetPosition(BITREADER reader)
 {
   return reader->stream_pos;
+}
+
+void BitWriter_SetStart(BITWRITER writer, unsigned char *buffer)
+{
+  assert(writer != NULL);
+  assert(buffer != NULL);
+
+  writer->stream = buffer;
+  writer->stream_pos = 0;
+  writer->nibbler = 0;
+  writer->nibbler_len = 0;
+}
+
+void BitWriter_WriteBits(BITWRITER writer, unsigned int value, int length)
+{
+  unsigned value_mask = (1 << length) - 1;
+  int merge_length = 8 - writer->nibbler_len;
+  int total_length = length + writer->nibbler_len;
+
+  if(total_length < 8) {
+    writer->nibbler = (writer->nibbler << length) | (value & value_mask);
+    writer->nibbler_len += length;
+    return;
+  }
+
+  if(writer->nibbler_len) {
+    value_mask = (1 << merge_length) -1;
+    writer->nibbler = (writer->nibbler << merge_length) | ((value >> (length - merge_length)) & value_mask);
+    writer->stream[writer->stream_pos++] = writer->nibbler & 0xFF;
+    length -= merge_length;
+  }
+
+  while(length >= 8) {
+    length -= 8;
+    writer->stream[writer->stream_pos++] = (value >> length) & 0xFF;
+  }
+
+  writer->nibbler = value & ((1 << length) - 1);
+  writer->nibbler_len = length;
+}
+
+void BitWriter_Flush(BITWRITER writer)
+{
+  if(writer->nibbler_len)
+    writer->stream[writer->stream_pos++] = writer->nibbler << (8 - writer->nibbler_len);
+
+  writer->nibbler = 0;
+  writer->nibbler_len = 0;
+}
+
+int BitWriter_GetPosition(BITWRITER writer)
+{
+  return writer->stream_pos;
+}
+
+int Encode7bitASCII(unsigned char *dest, const char *src, int src_length)
+{
+  BitWriter writer;
+  int i;
+
+  BitWriter_SetStart(&writer, dest);
+  for(i = 0; i < src_length; i++) {
+    BitWriter_WriteBits(&writer, src[i], 7);
+  }
+  BitWriter_Flush(&writer);
+  return BitWriter_GetPosition(&writer);
 }
 
 int CDMA_DecodeWithBCDAlphabet(unsigned char value)
@@ -197,17 +267,17 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
 GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigned char *buffer, int *length)
 {
   GSM_Error error = ERR_NONE;
-  int len = 0;
+  int encoding_ofs = -1;
+  char *sms_text = NULL;
+  unsigned char *dest_ptr = NULL;
+  size_t len = 0;
 
   len = GSM_PackSemiOctetNumber(SMS->Number, buffer + 1, FALSE);
   *buffer = len;
   *length += len + 1;
   smfprintf(di, "Destination number: \"%s\"\n", DecodeUnicodeString(SMS->Number));
 
-  // TODO: [KS] Find out where callback number should come from
-  EncodeUnicode(SMS->OtherNumbers[0], "01148574226146", 14);
-
-  len = GSM_PackSemiOctetNumber(SMS->OtherNumbers[0], buffer + *length + 1, FALSE);
+  len = GSM_PackSemiOctetNumber(SMS->SMSC.Number, buffer + *length + 1, FALSE);
   *(buffer + *length) = len;
   *length += len + 1;
   smfprintf(di, "Callback number: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[0]));
@@ -218,19 +288,30 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   // TODO: [KS] support priorities
   buffer[(*length)++] = SMS_PRIORITY_NORMAL;
 
-  // TODO: [KS] support other encodings
-  buffer[(*length)++] = SMS_ENC_OCTET;
+  encoding_ofs = (*length)++;
 
   // TODO: [KS] support UDH
   buffer[(*length)++] = 0;
-
   buffer[(*length)++] = SMS->Length;
 
-  // TODO: [KS] support other encodings [SMS_ENC_OCTET]
-  memcpy(buffer + *length, DecodeUnicodeString(SMS->Text), SMS->Length);
-  DumpMessageText(di, SMS->Text, SMS->Length);
-
-  *length += SMS->Length;
+  sms_text = DecodeUnicodeString(SMS->Text);
+  len = strlen(sms_text);
+  dest_ptr = buffer + *length;
+  switch(SMS->Coding) {
+    case SMS_Coding_Default_No_Compression:
+      buffer[encoding_ofs] = SMS_ENC_GSM;
+      EncodeDefault(dest_ptr, SMS->Text, &len, TRUE, NULL);
+      *length += Encode7bitASCII(dest_ptr, dest_ptr, len);
+      break;
+    case SMS_Coding_8bit:
+      buffer[encoding_ofs] = SMS_ENC_OCTET;
+      memcpy(dest_ptr, sms_text, len);
+      *length += len;
+      break;
+    default:
+      buffer[encoding_ofs] = SMS_ENC_ASCII;
+      *length += Encode7bitASCII(dest_ptr, sms_text, len);
+  }
 
   return error;
 }

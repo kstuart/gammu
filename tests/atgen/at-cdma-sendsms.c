@@ -41,12 +41,16 @@ int main(void)
 
   memset(&msms, 0, sizeof(msms));
 
+  char msg[] = "aaaaaaaaaabbbbbbbbbb";
+
   EncodeUnicode(sms->Number, "01194356453", 11);
-  EncodeUnicode(sms->OtherNumbers[0], "01692264851", 11);
-  EncodeUnicode(sms->Text, "aaaaaaaaaa", 10);
+  EncodeUnicode(sms->Text, msg, strlen(msg));
   sms->Length = UnicodeLength(sms->Text);
   sms->PDU = SMS_Submit;
   sms->SMSC = config->SMSC;
+  //sms->Coding = SMS_Coding_Default_No_Compression;
+  sms->Coding = SMS_Coding_ASCII;
+  //sms->Coding = SMS_Coding_8bit;
 
   error = ATGEN_SendSMS(s, sms);
   test_result(error == ERR_NONE);
