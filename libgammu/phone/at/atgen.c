@@ -2397,7 +2397,7 @@ GSM_Error ATGEN_Initialise(GSM_StateMachine *s)
     }
   }
 
-  smfprintf(s, "Network type: %s\n", NetworkTypeToString(s->CurrentConfig->NetworkType));
+	smprintf(s, "Network type: %s\n", NetworkTypeToString(s->CurrentConfig->NetworkType));
 
 	s->Protocol.Data.AT.FastWrite = !GSM_IsPhoneFeatureAvailable(s->Phone.Data.ModelInfo, F_SLOWWRITE);
 	s->Protocol.Data.AT.CPINNoOK = GSM_IsPhoneFeatureAvailable(s->Phone.Data.ModelInfo, F_CPIN_NO_OK);

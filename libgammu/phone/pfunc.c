@@ -75,7 +75,7 @@ GSM_Error PHONE_EncodeSMSFrame(GSM_StateMachine *s, GSM_SMSMessage *SMS, unsigne
 		}
 	}
 
-	if(s->CurrentConfig->NetworkType == NETWORK_CDMA)
+	if(s && s->CurrentConfig->NetworkType == NETWORK_CDMA)
     return ATCDMA_EncodePDUFrame(GSM_GetDI(s), SMS, buffer, length);
 
 	return GSM_EncodeSMSFrame(GSM_GetDI(s), SMS, buffer, Layout, length, clear);
