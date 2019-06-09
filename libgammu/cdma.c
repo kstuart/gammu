@@ -199,16 +199,20 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   *length += len + 1;
   smfprintf(di, "Destination Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
 
-  len = GSM_PackSemiOctetNumber(SMS->OtherNumbers[0], buffer + *length + 1, FALSE);
-  *(buffer + *length) = len;
-  *length += len + 1;
-  smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[0]));
+  if(SMS->CallbackIndex >= 0) {
+    assert(SMS->OtherNumbersNum > 0);
+    len = GSM_PackSemiOctetNumber(SMS->OtherNumbers[SMS->CallbackIndex], buffer + *length + 1, FALSE);
+    *(buffer + *length) = len;
+    *length += len + 1;
+    smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[SMS->CallbackIndex]));
+  } else {
+    *(buffer + (*length)++) = 0;
+  }
 
   *((unsigned short*)&buffer[*length]) = htons(TELESERVICE_ID_SMS);
   *length += 2;
 
-  // TODO: [KS] support priorities
-  buffer[(*length)++] = SMS_PRIORITY_NORMAL;
+  buffer[(*length)++] = SMS->Priority;
 
   encoding_ofs = (*length)++;
 

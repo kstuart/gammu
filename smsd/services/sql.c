@@ -450,6 +450,7 @@ static GSM_Error SMSDSQL_NamedQuery(GSM_SMSDConfig * Config, const char *sql_que
 							switch (sms->Coding) {
 								case SMS_Coding_Unicode_No_Compression:
 								case SMS_Coding_Default_No_Compression:
+								case SMS_Coding_ASCII:
 									EncodeHexUnicode(static_buff, sms->Text, UnicodeLength(sms->Text));
 									break;
 								case SMS_Coding_8bit:
@@ -499,6 +500,7 @@ static GSM_Error SMSDSQL_NamedQuery(GSM_SMSDConfig * Config, const char *sql_que
 								       switch (sms->Coding) {
 									       case SMS_Coding_Unicode_No_Compression:
 									       case SMS_Coding_Default_No_Compression:
+									       case SMS_Coding_ASCII:
 										       EncodeUTF8(static_buff, sms->Text);
 										       to_print = static_buff;
 										       break;
@@ -1066,8 +1068,8 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		} else {
 			switch (sms->SMS[sms->Number].Coding) {
 				case SMS_Coding_Unicode_No_Compression:
-
 				case SMS_Coding_Default_No_Compression:
+        case SMS_Coding_ASCII:
 					if (! DecodeHexUnicode(sms->SMS[sms->Number].Text, text, text_len)) {
 						SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
 						return ERR_UNKNOWN;

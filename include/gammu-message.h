@@ -491,6 +491,11 @@ typedef struct {
 	int OtherNumbersNum;
 
 	/**
+	 * The index in OtherNumbers of the CDMA Callback if one was provided.
+	 */
+	int CallbackIndex;
+
+	/**
 	 * SMSC (SMS Center)
 	 */
 	GSM_SMSC SMSC;

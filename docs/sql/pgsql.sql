@@ -84,7 +84,7 @@ CREATE TABLE inbox (
   "Processed" boolean NOT NULL DEFAULT 'false',
   "Status" integer NOT NULL DEFAULT '-1',
   CHECK ("Coding" IN 
-  ('Default_No_Compression','Unicode_No_Compression','8bit','Default_Compression','Unicode_Compression')) 
+  ('Default_No_Compression','Unicode_No_Compression','8bit','Default_Compression','Unicode_Compression', '7bit_ASCII')) 
 );
 
 -- 

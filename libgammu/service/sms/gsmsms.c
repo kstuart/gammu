@@ -1154,6 +1154,8 @@ void GSM_SetDefaultSMSData(GSM_SMSMessage *SMS)
 	SMS->Memory			= 0;
 	SMS->Folder			= 0x02;	/*Outbox*/
 	SMS->InboxFolder		= FALSE;
+	SMS->CallbackIndex = -1;
+	SMS->Priority = SMS_PRIORITY_NORMAL;
 	GSM_GetCurrentDateTime (&SMS->DateTime);
 	GSM_GetCurrentDateTime (&SMS->SMSCTime);
 }
