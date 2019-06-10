@@ -24,7 +24,7 @@ int main(void)
     "+CPMS: 1,99,1,99\r",
     "OK\r\n",
     "+CMGR: 0,,25\r",
-    "088010415847221664190530095939100200020004E9979F40\r",
+    "088010415667621664190530095939100200020004E9979F40\r",
     "OK\r\n",
 
     "ERROR\r\n"
@@ -49,6 +49,7 @@ int main(void)
   test_result(error == ERR_NONE);
   test_result(sms->Length == 4);
   test_result(sms->Coding == SMS_Coding_ASCII);
+  test_result(sms->Priority == SMS_PRIORITY_NORMAL);
   test_result(strcmp("test", DecodeUnicodeString(sms->Text)) == 0);
 
   cleanup_state_machine(s);

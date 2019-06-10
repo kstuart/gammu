@@ -51,6 +51,9 @@ smsd_test(smsd-cancel-call)
 smsd_test(smsd-incoming-ussd)
 
 # 3GPP2 (CDMA)
-smsd_test(at-cdma-cmgr)
+#atgen_test(at-cdma-pdu-encoder)
+#atgen_test(at-cdma-pdu-decoder)
 smsd_test(at-cdma-cmgl)
+smsd_test(at-cdma-cmgr)
+
 smsd_test(at-cdma-sendsms)

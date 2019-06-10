@@ -1733,6 +1733,7 @@ GSM_Error ATGEN_MakeSMSFrame(GSM_StateMachine *s, GSM_SMSMessage *message, unsig
 		    EncodeHexBin(hexreq, buffer, length);
 		    *length2 = length * 2;
 		    *current = length - (*((unsigned char*)buffer) + 1);
+        smprintf(s, "LEN: %lu\nCMGS-LEN: %u\nPDU: %s\n", *length2, *current, hexreq);
 				return error;
 			}
 

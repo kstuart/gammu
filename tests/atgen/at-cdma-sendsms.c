@@ -17,6 +17,7 @@ int main(void)
   GSM_StateMachine *s = NULL;
   GSM_SMSDStatus status;
   GSM_SMSDConfig *config = SMSD_NewConfig("test");
+  char msg[250];
 
   const char *responses[] = {
     "\r\n> ",
@@ -40,9 +41,9 @@ int main(void)
   config->Status = &status;
 
   memset(&msms, 0, sizeof(msms));
-  char msg[] = "aaaaaaaaaabbbbbbbbbb";
+  strcpy(msg, "aaaaaaaaaabbbbbbbbbb");
 
-  EncodeUnicode(sms->Number, "01248347480534", 13);
+  EncodeUnicode(sms->Number, "01148609200534", 14);
   EncodeUnicode(sms->Text, msg, strlen(msg));
   sms->Length = UnicodeLength(sms->Text);
   sms->PDU = SMS_Submit;
@@ -50,6 +51,9 @@ int main(void)
   //sms->Coding = SMS_Coding_Default_No_Compression;
   sms->Coding = SMS_Coding_ASCII;
   //sms->Coding = SMS_Coding_8bit;
+
+//  s->CurrentConfig->PhoneNumber[0] = '\0';
+//  s->CurrentConfig->PhoneNumber[1] = '\0';
 
   error = ATGEN_SendSMS(s, sms);
   test_result(error == ERR_NONE);
