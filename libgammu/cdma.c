@@ -8,7 +8,13 @@
 #include "cdma.h"
 
 #include <assert.h>
+
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#else
 #include <netinet/in.h>
+#endif
 
 int Decode7bitASCII(char *dest, const unsigned char *src, int src_length)
 {
