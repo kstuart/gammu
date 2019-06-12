@@ -137,7 +137,6 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
   if (error != ERR_NONE)
     return error;
 
-  // TODO: [KS] How to map priorities?
   SMS->Priority = buffer[pos++];
   smfprintf(di, "Priority: [%d] %s\n", SMS->Priority, CDMA_SMSPriorityToString(SMS->Priority));
 
@@ -224,7 +223,7 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
 
   // TODO: [KS] support UDH
   buffer[(*length)++] = 0;
-  buffer[(*length)++] = SMS->Length;
+  buffer[(*length)++] = UnicodeLength(SMS->Text);
 
   sms_text = DecodeUnicodeString(SMS->Text);
   len = strlen(sms_text);

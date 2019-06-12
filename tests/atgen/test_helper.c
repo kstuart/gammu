@@ -68,12 +68,14 @@ void set_echo(unsigned const char *buf, const size_t len)
 
 ssize_t _ResponseReadDevice(GSM_StateMachine *s UNUSED, void *buf, size_t nbytes)
 {
+  GSM_Phone *Phone = &_response_queue.stateMachine->Phone;
+  GSM_Phone_ATGENData *Priv = &Phone->Data.Priv.ATGEN;
   size_t read_len = 0;
 
-  if(_response_queue.stateMachine->Phone.Data.SentMsg == NULL)
+  if(Phone->Data.SentMsg == NULL && Priv->ReplyState != AT_Reply_SMSEdit)
     return 0;
 
-  if(_echo_buffer.echoed == FALSE && _echo_buffer.echo_len > 0) {
+  if(_echo_buffer.echoed == FALSE && _echo_buffer.echo_len > 0) { //} && _echo_buffer.echo[0] != 0x1A) {
     read_len = _echo_buffer.echo_len;
     if(read_len > nbytes) {
       // shouldn't happen in current design, so truncate for now.

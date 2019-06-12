@@ -335,6 +335,11 @@ typedef enum {
 } GSM_Coding_Type;
 
 /**
+ * Returns the default encoding of the network
+ */
+GSM_Coding_Type GSM_NetworkDefaultCoding(GSM_Config *cfg);
+
+/**
  * Converts SMS coding to string.
  *
  * \return Pointer to static string, NULL on failure.

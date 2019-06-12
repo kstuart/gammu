@@ -1272,6 +1272,14 @@ gboolean GSM_DecodeSiemensOTASMS(GSM_Debug_Info *di, GSM_SiemensOTASMSInfo	*Info
 	return TRUE;
 }
 
+GSM_Coding_Type GSM_NetworkDefaultCoding(GSM_Config *cfg)
+{
+  switch (cfg->NetworkType) {
+    case NETWORK_CDMA: return SMS_Coding_ASCII;
+    default: return SMS_Coding_Default_No_Compression;
+  }
+}
+
 GSM_Coding_Type GSM_StringToSMSCoding(const char *s)
 {
 	/* Maintain those without compression for backward compatibility */

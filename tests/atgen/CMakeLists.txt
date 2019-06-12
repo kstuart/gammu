@@ -56,4 +56,3 @@ smsd_test(smsd-incoming-ussd)
 smsd_test(at-cdma-cmgl)
 smsd_test(at-cdma-cmgr)
 
-smsd_test(at-cdma-sendsms)

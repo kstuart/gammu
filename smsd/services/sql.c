@@ -1025,7 +1025,6 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		}
 
 		text = db->GetString(Config, &res, 0);
-		coding = db->GetString(Config, &res, 1);
 		if (text == NULL) {
 			text_len = 0;
 		} else {
@@ -1043,14 +1042,18 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		/* ID, we don't need it, but some ODBC backend need to fetch all values */
 		db->GetNumber(Config, &res, 5);
 
-		sms->SMS[sms->Number].Coding = GSM_StringToSMSCoding(coding);
+    coding = db->GetString(Config, &res, 1);
+		if(coding && strncasecmp("network_default", coding, 15) == 0) {
+      sms->SMS[sms->Number].Coding = GSM_NetworkDefaultCoding(Config->gsm->CurrentConfig);
+    }
+		else {
+      sms->SMS[sms->Number].Coding = GSM_StringToSMSCoding(coding);
+    }
+
 		if (sms->SMS[sms->Number].Coding == 0) {
 			if (text == NULL || text_len == 0) {
 				SMSD_Log(DEBUG_NOTICE, Config, "Assuming default coding for text message");
-				sms->SMS[sms->Number].Coding =
-				  Config->gsm->CurrentConfig->NetworkType == NETWORK_CDMA ?
-    			  SMS_Coding_ASCII :
-		  		  SMS_Coding_Default_No_Compression;
+				sms->SMS[sms->Number].Coding = GSM_NetworkDefaultCoding(Config->gsm->CurrentConfig);
 			} else {
 				SMSD_Log(DEBUG_NOTICE, Config, "Assuming 8bit coding for binary message");
 				sms->SMS[sms->Number].Coding = SMS_Coding_8bit;
@@ -1163,7 +1166,7 @@ static GSM_Error SMSDSQL_MoveSMS(GSM_MultiSMSMessage * sms UNUSED, GSM_SMSDConfi
 }
 
 /* Adds SMS to Outbox */
-static GSM_Error SMSDSQL_CreateOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *NewID)
+GSM_Error SMSDSQL_CreateOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *NewID)
 {
 	char creator[200];
 	int i;
