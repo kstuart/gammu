@@ -8,9 +8,16 @@
 --
 alter table inbox drop constraint "inbox_Coding_check";
 alter table inbox add constraint "inbox_Coding_check"
-  check ("Coding" IN ('Network_Default', '7bit_ASCII', 'Default_No_Compression', 'Unicode_No_Compression', '8bit', 'Default_Compression', 'Unicode_Compression'));
+  check ("Coding" IN ('Default_No_Compression', 'Unicode_No_Compression', '8bit', 'Default_Compression', 'Unicode_Compression', '7bit_ASCII'));
 
 alter table outbox drop constraint "outbox_Coding_check";
 alter table outbox add constraint "outbox_Coding_check"
-  check ("Coding" IN ('Network_Default', '7bit_ASCII', 'Default_No_Compression', 'Unicode_No_Compression', '8bit', 'Default_Compression', 'Unicode_Compression'));
+  check ("Coding" IN ('Network_Default', 'Default_No_Compression', 'Unicode_No_Compression', '8bit', 'Default_Compression', 'Unicode_Compression', '7bit_ASCII'));
 
+alter table outbox_multipart drop constraint "outbox_multipart_Coding_check";
+alter table outbox_multipart add constraint "outbox_multipart_Coding_check"
+  check ("Coding" IN ('Network_Default', 'Default_No_Compression', 'Unicode_No_Compression', '8bit', 'Default_Compression', 'Unicode_Compression', '7bit_ASCII'));
+
+alter table sentitems drop constraint "sentitems_Coding_check";
+alter table sentitems add constraint "sentitems_Coding_check"
+  check ("Coding" IN ('Default_No_Compression', 'Unicode_No_Compression', '8bit', 'Default_Compression', 'Unicode_Compression', '7bit_ASCII'));
