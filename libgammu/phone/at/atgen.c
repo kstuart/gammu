@@ -2387,14 +2387,8 @@ GSM_Error ATGEN_Initialise(GSM_StateMachine *s)
   ATGEN_WaitForAutoLen(s, "AT+CHUP=?\r", 0x00, 40, ID_CheckCHUP);
 
   if(s->CurrentConfig->NetworkType == NETWORK_AUTO) {
-    // TODO: [KS] when not determined by phone feature or configuration then set according to reported network,
+    // TODO: [KS] when not determined by configuration then set according to reported network,
     //  maybe move to ATGEN_GetNetworkInfo
-
-    if(GSM_IsPhoneFeatureAvailable(s->Phone.Data.ModelInfo, F_NETWORK_CDMA)) {
-      s->CurrentConfig->NetworkType = NETWORK_CDMA;
-    } else {
-      s->CurrentConfig->NetworkType = NETWORK_GSM;
-    }
   }
 
 	smprintf(s, "Network type: %s\n", NetworkTypeToString(s->CurrentConfig->NetworkType));

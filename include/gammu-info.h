@@ -738,10 +738,6 @@ typedef enum {
 	 */
 	F_SMS_NO_SR,
 	/**
-	 * Indicates device uses the 3GPP2 CDMA Standard.
-	 */
-	F_NETWORK_CDMA,
-	/**
 	 * Just marker of highest feature code, should not be used.
 	 */
 	F_LAST_VALUE
