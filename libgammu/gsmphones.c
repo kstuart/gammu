@@ -132,7 +132,6 @@ GSM_FeatureName AllFeatureNames[] = {
 	{"USSD_GSM_CHARSET", F_USSD_GSM_CHARSET},
 	{"SMS_SR", F_SMS_SR},
 	{"SMS_NO_SR", F_SMS_NO_SR},
-	{"NETWORK_CDMA", F_NETWORK_CDMA},
 	{"", 0},
 };
 
@@ -988,7 +987,6 @@ GSM_PhoneModel allmodels[] = {
 	/* Telit */
 	{"HE910-D",	"HE910-D",	"",		{F_USSD_GSM_CHARSET, 0}},
 	{"HE910",	"HE910",	"",		{F_USSD_GSM_CHARSET, 0}},
-	{"LM940",	"LM940",	"",		{F_NETWORK_CDMA, 0}},
 
 	/* ZTE */
 	{"MF100",	"MF100",	"",		{F_ZTE_INIT, 0}},
