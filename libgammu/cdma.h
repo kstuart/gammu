@@ -41,7 +41,8 @@ typedef enum {
 typedef enum {
   TELESERVICE_ID_PAGE = 4097,
   TELESERVICE_ID_SMS = 4098,
-  TELESERVICE_ID_VOICEMAIL = 4099
+  TELESERVICE_ID_VOICEMAIL = 4099,
+  TELESERVICE_ID_SMS_MULTI = 4101
 } TELESERVICE_ID;
 
 GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS,
@@ -49,8 +50,6 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS,
 
 GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS,
   unsigned char *buffer, int *length);
-
-GSM_Error ATCDMA_SendSMS(GSM_StateMachine *s, GSM_SMSMessage *sms);
 
 const char *NetworkTypeToString(NETWORK_TYPE networkType);
 const char *TeleserviceIdToString(TELESERVICE_ID teleserviceId);
