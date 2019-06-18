@@ -24,8 +24,3 @@ Service=FILES
 inboxpath=${PROJECT_BINARY_DIR}/inbox/
 outboxpath=${PROJECT_BINARY_DIR}/outbox/
 
-service=sql
-driver=native_pgsql
-host=localhost
-database=smsd
-user=smsd

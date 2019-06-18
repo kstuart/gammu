@@ -109,15 +109,18 @@ GSM_Error _ResponseWriteMessage(GSM_StateMachine *s UNUSED, unsigned const char 
   return ERR_NONE;
 }
 
+GSM_Debug_Info *set_debug_info(void)
+{
+  GSM_Debug_Info *di = GSM_GetGlobalDebug();
+  GSM_SetDebugFileDescriptor(stderr, FALSE, di);
+  GSM_SetDebugLevel("textall", di);
+  return di;
+}
+
 GSM_StateMachine* setup_state_machine(void)
 {
-  GSM_Debug_Info *debug_info;
+  GSM_Debug_Info *debug_info = set_debug_info();
   GSM_StateMachine *s;
-
-  /* Configure state machine */
-  debug_info = GSM_GetGlobalDebug();
-  GSM_SetDebugFileDescriptor(stderr, FALSE, debug_info);
-  GSM_SetDebugLevel("textall", debug_info);
 
   /* Allocates state machine */
   s = GSM_AllocStateMachine();

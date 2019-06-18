@@ -2073,7 +2073,9 @@ GSM_Error ATGEN_SendSMS(GSM_StateMachine *s, GSM_SMSMessage *sms)
     } else {
       smprintf(s, "Callback Number cannot be set, no slots available.\n");
     }
-  }
+  } else {
+	  sms->CallbackIndex = -1;
+	}
 
 	if (sms->PDU == SMS_Deliver) {
 		sms->PDU = SMS_Submit;
