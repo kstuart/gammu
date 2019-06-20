@@ -1299,7 +1299,7 @@ GSM_Coding_Type GSM_StringToSMSCoding(const char *s)
 		return SMS_Coding_Default_Compression;
 	} else if (strcmp("8bit", s) == 0) {
 		return SMS_Coding_8bit;
-  } else if (strcmp("7bit_ASCII", s) == 0) {
+  } else if (strcmp("ASCII", s) == 0) {
     return SMS_Coding_ASCII;
 	}
 
@@ -1320,7 +1320,7 @@ const char *GSM_SMSCodingToString(GSM_Coding_Type type)
 		case SMS_Coding_8bit:
 			return "8bit";
 	  case SMS_Coding_ASCII:
-	    return "7bit_ASCII";
+	    return "ASCII";
 	  default:
       return NULL;
 	}

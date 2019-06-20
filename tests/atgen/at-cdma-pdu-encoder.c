@@ -5,15 +5,16 @@
 #include "../../libgammu/cdma.h"
 
 #include "test_helper.h"
-#include "../../libgammu/service/sms/gsmmulti.h"
+
+#define BUFFSIZE 4096
 
 void encode_pdu_ascii(void)
 {
   GSM_Error error;
   GSM_Debug_Info *di = set_debug_info();
   GSM_SMSMessage sms;
-  unsigned char pdu_hex[4096] = { 0 };
-  unsigned char pdu[4096] = { 0 };
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
   int pos = 0;
 
   puts(__func__);
@@ -36,20 +37,16 @@ void encode_pdu_ascii(void)
     pos * 2) == 0);
 }
 
-void encode_pdu_octet(void)
+void encode_pdu_gsm(void)
 {
   GSM_Error error;
-  GSM_Debug_Info *di;
+  GSM_Debug_Info *di = set_debug_info();
   GSM_SMSMessage sms;
-  unsigned char pdu_hex[4096] = { 0 };
-  unsigned char pdu[4096] = { 0 };
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
   int pos = 0;
 
   puts(__func__);
-
-  di = GSM_GetGlobalDebug();
-  GSM_SetDebugFileDescriptor(stderr, FALSE, di);
-  GSM_SetDebugLevel("textall", di);
 
   GSM_SetDefaultSMSData(&sms);
 
@@ -57,7 +54,7 @@ void encode_pdu_octet(void)
   EncodeUnicode(sms.Text, "aaaaaaaaaabbbbbbbbbb", 20);
   sms.Length = UnicodeLength(sms.Text);
   sms.UDH.Type = UDH_NoUDH;
-  sms.Coding = SMS_Coding_8bit;
+  sms.Coding = SMS_Coding_Default_No_Compression;
 
   error = ATCDMA_EncodePDUFrame(di, &sms, pdu, &pos);
   test_result(error == ERR_NONE);
@@ -65,17 +62,17 @@ void encode_pdu_octet(void)
   EncodeHexBin(pdu_hex, pdu, pos);
   test_result(memcmp(
     pdu_hex,
-    "088110416890025043001002000000146161616161616161616162626262626262626262",
+    "088110416890025043001002000900156161616161616161616162626262626262626262",
     pos * 2) == 0);
 }
 
 void encode_pdu_unicode(void)
 {
   GSM_Error error;
-  GSM_Debug_Info *di;
+  GSM_Debug_Info *di = set_debug_info();
   GSM_SMSMessage sms;
-  unsigned char pdu_hex[4096] = { 0 };
-  unsigned char pdu[4096] = { 0 };
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
   int pos = 0;
 
   const unsigned char unc_text[] = { // "Zażółć gęślą jaźń  "
@@ -84,10 +81,6 @@ void encode_pdu_unicode(void)
     0x01, 0x44, 0x00, 0x20, 0x00, 0x00 };
 
   puts(__func__);
-
-  di = GSM_GetGlobalDebug();
-  GSM_SetDebugFileDescriptor(stderr, FALSE, di);
-  GSM_SetDebugLevel("textall", di);
 
   GSM_SetDefaultSMSData(&sms);
 
@@ -107,13 +100,42 @@ void encode_pdu_unicode(void)
     pos * 2) == 0);
 }
 
+void encode_pdu_octet(void)
+{
+  GSM_Error error;
+  GSM_Debug_Info *di = set_debug_info();
+  GSM_SMSMessage sms;
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
+  int pos = 0;
+
+  puts(__func__);
+
+  GSM_SetDefaultSMSData(&sms);
+
+  EncodeUnicode(sms.Number, "01148609200534", 14);
+  EncodeUnicode(sms.Text, "aaaaaaaaaabbbbbbbbbb", 20);
+  sms.Length = UnicodeLength(sms.Text);
+  sms.UDH.Type = UDH_NoUDH;
+  sms.Coding = SMS_Coding_8bit;
+
+  error = ATCDMA_EncodePDUFrame(di, &sms, pdu, &pos);
+  test_result(error == ERR_NONE);
+
+  EncodeHexBin(pdu_hex, pdu, pos);
+  test_result(memcmp(
+    pdu_hex,
+    "088110416890025043001002000000146161616161616161616162626262626262626262",
+    pos * 2) == 0);
+}
+
 void encode_pdu_ascii_multi(void)
 {
   GSM_Error error;
   GSM_Debug_Info *di = set_debug_info();
   GSM_SMSMessage sms;
-  unsigned char pdu_hex[4096] = { 0 };
-  unsigned char pdu[4096] = { 0 };
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
   int pos = 0;
 
   puts(__func__);
@@ -137,10 +159,44 @@ void encode_pdu_ascii_multi(void)
   test_result(error == ERR_NONE);
 
   EncodeHexBin(pdu_hex, pdu, pos);
-  smfprintf(di, "%s\n", pdu_hex);
   test_result(memcmp(
     pdu_hex,
     "0881104168900250430010050002011A0A001DF02070E1C3870E1C3870E1C58B162C58B162C588",
+    pos * 2) == 0);
+}
+
+void encode_pdu_gsm_multi(void)
+{
+  GSM_Error error;
+  GSM_Debug_Info *di = set_debug_info();
+  GSM_SMSMessage sms;
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
+  int pos = 0;
+
+  puts(__func__);
+
+  GSM_SetDefaultSMSData(&sms);
+
+  EncodeUnicode(sms.Number, "01148609200534", 14);
+  EncodeUnicode(sms.Text, "FFFFFFFFFFFFFFAAA", 17);
+  sms.Length = UnicodeLength(sms.Text);
+  sms.UDH.Type = UDH_ConcatenatedMessages;
+  sms.UDH.Length = 6;
+  sms.UDH.Text[0] = 5;
+  sms.UDH.Text[2] = 3;
+  sms.UDH.Text[3] = 95;
+  sms.UDH.Text[4] = 2;
+  sms.UDH.Text[5] = 2;
+  sms.Coding = SMS_Coding_Default_No_Compression;
+
+  error = ATCDMA_EncodePDUFrame(di, &sms, pdu, &pos);
+  test_result(error == ERR_NONE);
+
+  EncodeHexBin(pdu_hex, pdu, pos);
+  test_result(memcmp(
+    pdu_hex,
+    "088110416890025043001005000901180500035F02024646464646464646464646464646414141",
     pos * 2) == 0);
 }
 
@@ -149,13 +205,12 @@ void encode_pdu_unicode_multi(void)
   GSM_Error error;
   GSM_Debug_Info *di = set_debug_info();
   GSM_SMSMessage sms;
-  unsigned char pdu_hex[4096] = { 0 };
-  unsigned char pdu[4096] = { 0 };
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
   int pos = 0;
 
   puts(__func__);
 
-  memset(&sms, 0, sizeof(GSM_SMSMessage));
   GSM_SetDefaultSMSData(&sms);
 
   EncodeUnicode(sms.Number, "01148609200534", 14);
@@ -174,20 +229,57 @@ void encode_pdu_unicode_multi(void)
   test_result(error == ERR_NONE);
 
   EncodeHexBin(pdu_hex, pdu, pos);
-  smfprintf(di, "%s\n", pdu_hex);
   test_result(memcmp(
     pdu_hex,
     "0881104168900250430010050004012E0500035F010100610061006100610061006100610061006100610062006200620062006200620062006200620062",
     pos * 2) == 0);
 }
+
+void encode_pdu_octet_multi(void)
+{
+  GSM_Error error;
+  GSM_Debug_Info *di = set_debug_info();
+  GSM_SMSMessage sms;
+  unsigned char pdu_hex[BUFFSIZE] = { 0 };
+  unsigned char pdu[BUFFSIZE] = { 0 };
+  int pos = 0;
+
+  puts(__func__);
+
+  GSM_SetDefaultSMSData(&sms);
+
+  EncodeUnicode(sms.Number, "01148609200534", 14);
+  EncodeUnicode(sms.Text, "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam a quam quis urna dignissim laoreet et quis orci.", 112);
+  sms.Length = UnicodeLength(sms.Text);
+  sms.UDH.Type = UDH_ConcatenatedMessages;
+  sms.UDH.Length = 6;
+  sms.UDH.Text[0] = 5;
+  sms.UDH.Text[2] = 3;
+  sms.UDH.Text[3] = 95;
+  sms.UDH.Text[4] = 2;
+  sms.UDH.Text[5] = 1;
+  sms.Coding = SMS_Coding_8bit;
+
+  error = ATCDMA_EncodePDUFrame(di, &sms, pdu, &pos);
+  test_result(error == ERR_NONE);
+
+  EncodeHexBin(pdu_hex, pdu, pos);
+  test_result(memcmp(
+    pdu_hex,
+    "088110416890025043001005000001760500035F02014C6F72656D20697073756D20646F6C6F722073697420616D65742C20636F6E73656374657475722061646970697363696E6720656C69742E204E756C6C616D2061207175616D20717569732075726E61206469676E697373696D206C616F726565742065742071756973206F7263692E",
+    pos * 2) == 0);
+}
+
 int main(void)
 {
   encode_pdu_ascii();
-
-  encode_pdu_octet();
+  encode_pdu_gsm();
   encode_pdu_unicode();
+  encode_pdu_octet();
 
   encode_pdu_ascii_multi();
+  encode_pdu_gsm_multi();
   encode_pdu_unicode_multi();
+  encode_pdu_octet_multi();
 }
 

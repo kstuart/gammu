@@ -274,7 +274,7 @@ void DisplaySingleSMSInfo(GSM_SMSMessage *sms, gboolean displaytext, gboolean di
 				printf("%s", _("8-bit"));
 				break;
 			case SMS_Coding_ASCII			:
-				printf("%s", _("7-bit ASCII"));
+				printf("%s", _("ASCII"));
 				break;
 		}
 		printf("\n");
