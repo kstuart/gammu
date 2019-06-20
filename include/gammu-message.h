@@ -1061,6 +1061,7 @@ typedef struct {
 typedef struct {
 	int EntriesNum;
 	gboolean UnicodeCoding;
+	gboolean AsciiCoding;
 	int Class;
 	unsigned char ReplaceMessage;
 	gboolean Unknown;

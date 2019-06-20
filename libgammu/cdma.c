@@ -188,9 +188,9 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
       break;
     case SMS_ENC_GSM:
       SMS->Coding = SMS_Coding_Default_No_Compression;
+      datalength--;
       SMS->Length = datalength;
       DecodeDefault(SMS->Text, data_ptr + udh_len, SMS->Length, TRUE, NULL);
-      smfprintf(di, "%s\n", DecodeUnicodeConsole(SMS->Text));
       pos += datalength + udh_len;
       break;
     case SMS_ENC_OCTET:
@@ -210,7 +210,7 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
 #ifdef DEBUG
   smfprintf(di, "SMS length %i\n",SMS->Length);
   DumpMessageText(di, SMS->Text, SMS->Length * 2);
-  smfprintf(di, "%s\n",DecodeUnicodeString(SMS->Text));
+  smfprintf(di, "%s\n", DecodeUnicodeString(SMS->Text));
 #endif
 
   if (final_pos)
@@ -228,6 +228,8 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   char *sms_text = NULL;
   unsigned char *sms_ptr = NULL;
   size_t sms_len = 0;
+
+  *length = 0;
 
   sms_len = GSM_PackSemiOctetNumber(SMS->Number, buffer + 1, FALSE);
   *buffer = sms_len;
@@ -253,7 +255,7 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
       *((unsigned short*)&buffer[*length]) = htons(TELESERVICE_ID_SMS_MULTI);
       break;
     default:
-      smfprintf(di, "Unknown UDH type, cannot set teleservice id.");
+      smfprintf(di, "Unknown UDH type (%d : %s), cannot set teleservice id.\n", SMS->UDH.Type, DecodeUnicodeString(SMS->UDH.Text));
       return ERR_NOTSUPPORTED;
   }
   *length += 2;
@@ -282,7 +284,7 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   datalength_ofs = (*length)++;
 
   sms_text = DecodeUnicodeString(SMS->Text);
-  sms_len = UnicodeLength(SMS->Text);//strlen(sms_text);
+  sms_len = UnicodeLength(SMS->Text);
 
   sms_ptr = buffer + *length + udh_len;
   switch(SMS->Coding) {
@@ -290,13 +292,8 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
       buffer[encoding_ofs] = SMS_ENC_GSM;
       sms_len = MIN(sms_len, 160);
       EncodeDefault(sms_ptr, SMS->Text, &sms_len, TRUE, NULL);
-      if(udh_len) {
-        *length += sms_len + udh_len;
-        buffer[datalength_ofs] = sms_len + udh_len;
-      } else {
-        *length += GSM_PackSevenBitsToEight(0, sms_ptr, sms_text, sms_len);
-        buffer[datalength_ofs] = sms_len + udh_len;
-      }
+      *length += sms_len + udh_len;
+      buffer[datalength_ofs] = 1 + sms_len + udh_len;
       break;
     case SMS_Coding_Unicode_No_Compression:
       buffer[encoding_ofs] = SMS_ENC_UNICODE;
@@ -314,6 +311,7 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
       break;
     case SMS_Coding_ASCII:
       buffer[encoding_ofs] = SMS_ENC_ASCII;
+      sms_len = MIN(sms_len, 160);
       memcpy(sms_ptr, sms_text, sms_len);
       *length += CDMA_Encode7bit(sms_ptr - udh_len, sms_ptr - udh_len, sms_len + udh_len);
       buffer[datalength_ofs] = sms_len + udh_len;
@@ -387,10 +385,10 @@ const char *CDMA_SMSPriorityToString(SMS_PRIORITY priority)
 const char *CDMA_SMSEncodingToString(SMS_ENCODING encoding)
 {
   switch(encoding) {
-    case SMS_ENC_OCTET: return "8-bit Octet";
-    case SMS_ENC_ASCII: return "7-bit ASCII";
-    case SMS_ENC_UNICODE: return "16-bit Unicode";
-    case SMS_ENC_GSM: return "GSM 7-bit";
-    default           : return "Unknown";
+    case SMS_ENC_ASCII   : return "ASCII";
+    case SMS_ENC_GSM     : return "GSM";
+    case SMS_ENC_UNICODE : return "Unicode";
+    case SMS_ENC_OCTET   : return "8-bit";
+    default              : return "Unknown";
   }
 }
