@@ -252,7 +252,6 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
       break;
     case UDH_ConcatenatedMessages:
     case UDH_ConcatenatedMessages16bit:
-    case UDH_UserUDH:
       *((unsigned short*)&buffer[*length]) = htons(TELESERVICE_ID_SMS_MULTI);
       break;
     default:

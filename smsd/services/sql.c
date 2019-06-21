@@ -1105,12 +1105,12 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 
 		sms->SMS[sms->Number].UDH.Type = UDH_NoUDH;
 		if (udh != NULL && udh_len != 0) {
-			sms->SMS[sms->Number].UDH.Type = UDH_UserUDH;
 			sms->SMS[sms->Number].UDH.Length = udh_len / 2;
 			if (! DecodeHexBin(sms->SMS[sms->Number].UDH.Text, udh, udh_len)) {
 				SMSD_Log(DEBUG_ERROR, Config, "Failed to decode UDH HEX string: %s", udh);
 				return ERR_UNKNOWN;
 			}
+			GSM_DecodeUDHHeader(GSM_GetDI(Config->gsm), &sms->SMS[sms->Number].UDH);
 		}
 
 		sms->SMS[sms->Number].PDU = SMS_Submit;
