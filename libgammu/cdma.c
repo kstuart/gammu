@@ -227,7 +227,7 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   int udh_len = 0;
   char *sms_text = NULL;
   unsigned char *sms_ptr = NULL;
-  size_t sms_len = 0;
+  int sms_len = 0;
 
   *length = 0;
 
@@ -245,6 +245,10 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   } else {
     *(buffer + (*length)++) = 0;
   }
+
+  // TODO: [KS] Disable multipart messages until LM940 firmware fix
+  if(SMS->UDH.Type == UDH_ConcatenatedMessages || SMS->UDH.Type == UDH_ConcatenatedMessages16bit)
+    SMS->UDH.Type = UDH_NoUDH;
 
   switch (SMS->UDH.Type) {
     case UDH_NoUDH:
@@ -286,12 +290,17 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   sms_text = DecodeUnicodeString(SMS->Text);
   sms_len = UnicodeLength(SMS->Text);
 
+  // NOTE: [KS] Switch GSM encoding to ASCII as sending messages using GSM
+  //  encoding doesn't appear to be supported
+  if(SMS->Coding == SMS_Coding_Default_No_Compression)
+    SMS->Coding = SMS_Coding_ASCII;
+
   sms_ptr = buffer + *length + udh_len;
   switch(SMS->Coding) {
     case SMS_Coding_Default_No_Compression:
       buffer[encoding_ofs] = SMS_ENC_GSM;
       sms_len = MIN(sms_len, 160);
-      EncodeDefault(sms_ptr, SMS->Text, &sms_len, TRUE, NULL);
+      EncodeDefault(sms_ptr, SMS->Text, (size_t*)&sms_len, TRUE, NULL);
       *length += sms_len + udh_len;
       buffer[datalength_ofs] = 1 + sms_len + udh_len;
       break;

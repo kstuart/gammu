@@ -14,17 +14,17 @@ void BitReader_SetStart(BitReader *reader, const unsigned char *buffer)
   reader->nibbles = 0;
 }
 
-unsigned BitReader_ReadBits(BitReader *reader, size_t length)
+nibbler_t BitReader_ReadBits(BitReader *reader, size_t length)
 {
   int i = 0;
   int bytesToRead = 0;
-  unsigned bitOffset = 0;
-  unsigned resultMask = (1u << length) - 1;
-  unsigned result = 0;
+  nibbler_t bitOffset = 0;
+  nibbler_t resultMask = (1u << length) - 1;
+  nibbler_t result = 0;
 
   assert(reader != NULL);
 
-  if(length < 1 || length > sizeof(unsigned) * 8)
+  if(length < 1 || length > sizeof(nibbler_t) * 8)
     return -1;
 
   if (length > reader->nibbles) {
@@ -59,19 +59,18 @@ void BitWriter_SetStart(BitWriter *writer, unsigned char *buffer)
   writer->nibbles = 0;
 }
 
-void BitWriter_WriteBits(BitWriter *writer, unsigned value, size_t length)
+void BitWriter_WriteBits(BitWriter *writer, nibbler_t value, size_t length)
 {
-  unsigned value_mask;
-  unsigned merge_length;
-  int total_length;
+  nibbler_t value_mask;
+  nibbler_t merge_length;
+  size_t total_length;
 
   assert(writer != NULL);
 
-  if(length < 1 || length > sizeof(unsigned) * 8)
+  if(length < 1 || length > sizeof(nibbler_t) * 8)
     return;
 
   value_mask = (1u << length) - 1;
-  merge_length = 8 - writer->nibbles;
   total_length = length + writer->nibbles;
 
   if(total_length < 8) {
@@ -81,6 +80,7 @@ void BitWriter_WriteBits(BitWriter *writer, unsigned value, size_t length)
   }
 
   if(writer->nibbles) {
+    merge_length = 8 - writer->nibbles;
     value_mask = (1u << merge_length) -1;
     writer->nibbler = (writer->nibbler << merge_length) | ((value >> (length - merge_length)) & value_mask);
     writer->stream[writer->streampos++] = writer->nibbler & 0xFFu;
