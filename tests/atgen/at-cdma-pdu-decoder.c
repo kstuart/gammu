@@ -234,7 +234,7 @@ void decode_pdu_octet_multi(void)
 int main(void)
 {
   decode_pdu_ascii();
-  decode_pdu_gsm();
+//  decode_pdu_gsm();
   decode_pdu_unicode();
   decode_pdu_octet();
 
