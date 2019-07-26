@@ -9,13 +9,20 @@ extern "C" {
 
 /**
  * CDMA SMS Encoding
+ * 3GPP2 C.R1001-D 9.1.1
  *
  * \ingroup SMS
  */
 typedef enum {
   SMS_ENC_OCTET = 0,
+  SMS_ENC_EXTENDED = 1,
   SMS_ENC_ASCII = 2,
+  SMS_ENC_IA5 = 3,
   SMS_ENC_UNICODE = 4,
+  SMS_ENC_SHIFT_JIS = 5,
+  SMS_ENC_KOREAN = 6,
+  SMS_ENC_HEBREW = 7,
+  SMS_ENC_LATIN = 8,
   SMS_ENC_GSM = 9
 } SMS_ENCODING;
 
