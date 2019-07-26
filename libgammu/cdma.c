@@ -194,6 +194,7 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
       pos += datalength + udh_len;
       break;
     case SMS_ENC_OCTET:
+    case SMS_ENC_LATIN:
       SMS->Coding = SMS_Coding_8bit;
       SMS->Length = datalength;
       EncodeUnicode(SMS->Text, data_ptr + udh_len, datalength);
@@ -291,7 +292,7 @@ GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigne
   sms_len = UnicodeLength(SMS->Text);
 
   // NOTE: [KS] Switch GSM encoding to ASCII as sending messages using GSM
-  //  encoding doesn't appear to be supported
+  //  encoding doesn't appear to be supported (on Verizon)
   if(SMS->Coding == SMS_Coding_Default_No_Compression)
     SMS->Coding = SMS_Coding_ASCII;
 
@@ -394,10 +395,16 @@ const char *CDMA_SMSPriorityToString(SMS_PRIORITY priority)
 const char *CDMA_SMSEncodingToString(SMS_ENCODING encoding)
 {
   switch(encoding) {
-    case SMS_ENC_ASCII   : return "ASCII";
-    case SMS_ENC_GSM     : return "GSM";
-    case SMS_ENC_UNICODE : return "Unicode";
-    case SMS_ENC_OCTET   : return "8-bit";
-    default              : return "Unknown";
+    case SMS_ENC_ASCII: return "ASCII";
+    case SMS_ENC_GSM: return "GSM";
+    case SMS_ENC_UNICODE: return "Unicode";
+    case SMS_ENC_LATIN: return "Latin (ISO 8859-1)";
+    case SMS_ENC_OCTET: return "8-bit";
+    case SMS_ENC_EXTENDED: return "Extended";
+    case SMS_ENC_IA5: return "IA5";
+    case SMS_ENC_SHIFT_JIS: return "SHIFT JIS";
+    case SMS_ENC_KOREAN: return "Korean";
+    case SMS_ENC_HEBREW: return "Hebrew";
+    default: return "Unknown";
   }
 }

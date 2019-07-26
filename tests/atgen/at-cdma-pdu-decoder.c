@@ -85,6 +85,30 @@ void decode_pdu_unicode(void)
   test_result(memcmp(unc_text, sms.Text, sms.Length * 2) == 0);
 }
 
+void decode_pdu_latin_1(void)
+{
+  GSM_Error error;
+  GSM_Debug_Info *di = set_debug_info();
+  GSM_SMSMessage sms;
+  unsigned char pdu[BUFFSIZE] = { 0 };
+  size_t pos = 0;
+
+  const char *pdu_hex = "0881104168909528611906120747401002000800084665636B206F6666";
+  const size_t pdu_len = strlen(pdu_hex);
+
+  puts(__func__);
+
+  sms.State = SMS_UnRead;
+  test_result(DecodeHexBin(pdu, pdu_hex, pdu_len));
+  error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len / 2, &pos);
+
+  test_result(error == ERR_NONE);
+  test_result(pos == pdu_len / 2);
+  test_result(sms.Length == 8);
+  test_result(sms.Coding == SMS_Coding_8bit);
+  test_result(strcmp("Feck off", DecodeUnicodeString(sms.Text)) == 0);
+}
+
 void decode_pdu_octet(void)
 {
   GSM_Error error;
@@ -234,6 +258,7 @@ void decode_pdu_octet_multi(void)
 int main(void)
 {
   decode_pdu_ascii();
+  decode_pdu_latin_1();
 //  decode_pdu_gsm();
   decode_pdu_unicode();
   decode_pdu_octet();
