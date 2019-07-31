@@ -501,6 +501,7 @@ static GSM_Error SMSDSQL_NamedQuery(GSM_SMSDConfig * Config, const char *sql_que
 									       case SMS_Coding_Unicode_No_Compression:
 									       case SMS_Coding_Default_No_Compression:
 									       case SMS_Coding_ASCII:
+									       case SMS_Coding_8bit:
 										       EncodeUTF8(static_buff, sms->Text);
 										       to_print = static_buff;
 										       break;
