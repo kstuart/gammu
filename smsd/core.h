@@ -23,6 +23,8 @@
 
 #include "../libgammu/misc/array.h"
 
+typedef struct _DynamicBuffer *DBUFFER;
+
 typedef enum {
 	DEBUG_ERROR = -1,
 	DEBUG_INFO = 0,
@@ -70,6 +72,15 @@ typedef struct {
 	GSM_Error	(*ReadConfiguration) (GSM_SMSDConfig *Config);
 } GSM_SMSDService;
 
+typedef struct _Buffer {
+	char *ptr;
+	size_t size;
+} CURLBuffer;
+
+typedef struct _MMSConveyor {
+	GSM_Error (*FetchMMS)(GSM_SMSDConfig*, DBUFFER, GSM_MMSIndicator*);
+} MMSConveyor;
+
 struct _GSM_SMSDConfig {
 	const char	*ServiceName;
 	const char *program_name;
@@ -88,6 +99,8 @@ struct _GSM_SMSDConfig {
 	const char   *RunOnFailure; /* run this command on phone communication failure */
 	const char   *RunOnSent; /* run this command when an SMS has been sent successfully */
 	const char   *RunOnIncomingCall; /* run this command when a phone call has been canceled */
+	const char *RunOnDataConnect; /* run this command to start/stop mobile data connection (PPP) */
+	const char *MMSCAddress; /* MMS Service Provider (MMSC) http address */
 	gboolean checksecurity;
 	gboolean hangupcalls;
 	gboolean checkbattery;
@@ -217,6 +230,8 @@ struct _GSM_SMSDConfig {
 #endif
 	GSM_SMSDStatus *Status;
 	GSM_SMSDService		*Service;
+	MMSConveyor *MMSConveyor;
+	DBUFFER MMSBuffer;
 };
 
 extern GSM_Error SMSD_NoneFunction		(void);

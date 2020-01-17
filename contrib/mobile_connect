@@ -1,0 +1,139 @@
+#!/usr/bin/env sh
+## Script: mobile_connect [establishes modem PPP network]
+## Version: 0.1.0
+## Created: 20191227
+## Depends: sudo, wvdial, ip, sleep
+## Author: Kenny Stuart
+## Source: https://github.com/kstuart/gammu/raw/master/contrib/mobile_connect
+## License: MIT
+
+## Copyright 2019 Kenny Stuart.
+##
+## Permission is hereby granted, free of charge, to any person obtaining
+## a copy of this software and associated documentation files (the
+## "Software"), to deal in the Software without restriction, including
+## without limitation the rights to use, copy, modify, merge, publish,
+## distribute, sublicense, and/or sell copies of the Software, and to
+## permit persons to whom the Software is furnished to do so, subject to
+## the following conditions:
+##
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+## LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+## OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+## WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+CMD_NAME="${0##*/}"
+DEFAULT_ROUTE_FILE="${SMSD_ROUTE_FILE:-/tmp/SMSD_DEFAULT_ROUTE}"
+DIALER_PROFILE="${WVDIAL_PROFILE:-Default}"
+read -r -d '' HELP <<EOF
+
+${CMD_NAME^^} - Establishes a modem network connection.
+Requires: sudo, wvdial, ip, sleep
+
+Usage: ${CMD_NAME} start (connect to mobile network)
+       ${CMD_NAME} stop  (disconnect mobile network)
+
+Once the PPP connection is fully established it is used as the
+default route for network traffic, use '${CMD_NAME} stop' to
+tear down the modem network and restore the default route.
+
+Sudo is used for priviledged operations so an appropriate rule
+would need to be set to avoid needing to enter a password, e.g:
+
+gammu alarmpi = NOPASSWD: /usr/bin/wvdial,
+                          /usr/bin/ip route del default,
+                          /usr/bin/ip route add default *
+
+The following optional environment variables can be used to
+alter the behaviour of this utility.
+
+WVDIAL_PROFILE     - If not set the 'Default' profile is used.
+SMSD_MBC_NOROUTE   - If set to value '1', will not adjust routing
+                     table.
+DEFAULT_ROUTE_FILE - File in which to save the default route
+                     that will be restored after disconnecting
+                     from the mobile network.
+EOF
+
+usage()
+{
+  echo "$HELP"
+  exit 0
+}
+
+wait_for_ppp_up()
+{
+  echo "Waiting for network setup..."
+  while true; do
+    MobileRoute=$(ip route | grep "ppp0" | cut -d" " -f1)
+    [ "X${MobileRoute}" = "X" ] || break
+    sleep 1
+  done
+}
+
+wait_for_ppp_down()
+{
+  while true; do
+    if [ -e /sys/class/net/ppp0 ] ; then
+      sleep 1
+    else
+      echo "Succesfully disconnected."
+      break
+    fi
+  done
+}
+
+set_default_route()
+{
+  if [ -e "${DEFAULT_ROUTE_FILE}" ] ; then
+    DefaultRoute=$(cat "${DEFAULT_ROUTE_FILE}")
+    rm "${DEFAULT_ROUTE_FILE}"
+    echo "Setting default route to ${DefaultRoute}"
+    sudo ip route del default >/dev/null 2>&1
+    sudo ip route add default via $DefaultRoute
+  fi
+}
+
+set_mobile_route()
+{
+  DefaultRoute=$(ip route show default | cut -d" " -f3-5)
+  echo "Saving current default route (${DefaultRoute})"
+  echo "${DefaultRoute}" > "${DEFAULT_ROUTE_FILE}"
+
+  echo "Setting default route to $MobileRoute dev ppp0"
+  sudo ip route del default >/dev/null 2>&1
+  sudo ip route add default via "$MobileRoute" dev ppp0
+}
+
+start()
+{
+  echo "Starting Mobile Data Network"
+  wvdial "$DIALER_PROFILE" >/dev/null 2>&1 &
+  wait_for_ppp_up
+  [ "X${SMSD_MBC_NOROUTE}" = "X1" ] || set_mobile_route
+  echo "Done."
+  exit 0
+}
+
+stop()
+{
+  echo "Stopping Mobile Data Network"
+  killall wvdial >/dev/null 2>&1
+  wait_for_ppp_down
+  [ "X${SMSD_MBC_NOROUTE}" = "X1" ] || set_default_route
+  echo "Done."
+  exit 0
+}
+
+[ "$#" -eq "0" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ] && usage
+
+ARG=${1^^}
+[ "$ARG" = "START" ] && start
+[ "$ARG" = "STOP" ] && stop
+[ "$ARG" = "HELP" ] && usage

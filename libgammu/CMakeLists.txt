@@ -4,6 +4,8 @@
 
 project (libGammu C)
 
+find_package(CURL REQUIRED)
+
 set (LIBRARY_SRC
     gsmcomon.c
     gsmphones.c
@@ -14,6 +16,7 @@ set (LIBRARY_SRC
     misc/misc.c
     misc/cfg.c
     misc/string.c
+    misc/dynamic-buffer.c
     misc/coding/coding.c
     service/sms/gsmsms.c
     service/sms/gsmems.c
@@ -124,6 +127,11 @@ if(MSVC)
 else(MSVC)
     add_library (libGammu ${LIBRARY_SRC})
 endif(MSVC)
+
+if (CURL_FOUND)
+    target_link_libraries (libGammu CURL::libcurl)
+endif (CURL_FOUND)
+
 add_coverage (libGammu)
 set_target_properties (libGammu PROPERTIES
     VERSION ${GAMMU_SOVERSION}.${GAMMU_VERSION}

@@ -29,6 +29,11 @@
 
 #include "../core.h"
 #include "../../libgammu/misc/string.h"
+#include "../../libgammu/misc/coding/coding.h"
+
+#include "../mms-service.h"
+#include "../mms-data.h"
+
 
 /**
  * Returns name of the SQL dialect to use.
@@ -708,6 +713,14 @@ static GSM_Error SMSDSQL_InitAfterConnect(GSM_SMSDConfig * Config)
 	return ERR_NONE;
 }
 
+typedef enum _IntToStringFMT {
+	FMT_DECIMAL,
+	FMT_HEX
+} IntToStringFmt;
+
+const char *IntToStr(unsigned long i, IntToStringFmt fmt);
+GSM_Error SMSD_RetrieveMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator);
+
 /* Save SMS from phone (called Inbox sms - it's in phone Inbox) somewhere */
 static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char **Locations)
 {
@@ -727,6 +740,7 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 	unsigned long long new_id;
 	size_t locations_size = 0, locations_pos = 0;
 	const char *state, *smsc;
+	int idx_last = sms->Number - 1;
 
 	*Locations = NULL;
 	sms->Processed = FALSE;
@@ -834,6 +848,63 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			return ERR_UNKNOWN;
 		}
 		SMSD_Log(DEBUG_NOTICE, Config, "Inserted message id %lu", (long)new_id);
+
+		if (i == idx_last) {
+			//	/* get any MMS attachments */
+			GSM_MultiPartSMSInfo SMSInfo;
+			MMSMESSAGE mms = NULL;
+
+			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
+				for (int i = 0; i < SMSInfo.EntriesNum; i++) {
+					if (SMSInfo.Entries[i].ID == SMS_MMSIndicatorLong) {
+						error = SMSD_RetrieveMMS(Config, SMSInfo.Entries[0].MMSIndicator);
+						if (error != ERR_NONE) {
+							SMSD_Log(DEBUG_ERROR, Config, "Failed to retrieve MMS");
+						}
+						if (MMS_ParseMessage(Config->MMSBuffer, &mms) != MME_NONE) {
+							SMSD_Log(DEBUG_ERROR, Config, "Failed to parse MMS Message");
+							assert(mms == NULL);
+						}
+					}
+				}
+				GSM_FreeMultiPartSMSInfo(&SMSInfo);
+			}
+
+			// TODO: save mms newid
+			unsigned char b2[65536];
+			DBUFFER buf = DynaBuf_InitWithCapacity(1024*4);
+			MMS_DumpHeaders(mms->headers, buf);
+//			EncodeUTF8QuotedPrintable(b2, DynaBufBase(buf));
+			//EncodeUTF8(b2, DynaBufBase(buf));
+			EncodeBASE64(DynaBufBase(buf), b2, DynaBufOffset(buf));
+			DynaBuf_Seek(buf, 0, SEEK_SET);
+//			DynaBuf_CopyUntil(buf, b2, 0);
+			DynaBuf_PutFormattedString(buf,
+				"update inbox set \"TextDecoded\" = decode('%s', 'base64') where \"ID\" = %d;",
+				b2, new_id);
+			SMSDSQL_Query(Config, DynaBufBase(buf), &res);
+
+
+
+			// save mms parts
+			for(int n = 0; n < mms->parts->end; n++) {
+				DynaBuf_Seek(buf, 0, SEEK_SET);
+				MMSPART p = &mms->parts->entries[n];
+				MMSHEADER h = MMSHeader_FindByID(p->headers, MMS_HEADER, MMS_CONTENT_TYPE);
+				EncodeBASE64(p->data, b2, p->data_len);
+				DynaBuf_PutFormattedString(buf,
+					"insert into inbox_mms_parts (\"INBOX_ID\", \"MediaType\", \"Data\") values (%d, '%s', decode('%s', 'base64'));",
+					new_id,
+					h->value.v.enum_v->name,
+					b2);
+				DynaBuf_PutByte(buf, 0);
+				SMSDSQL_Query(Config, DynaBufBase(buf), &res);
+			}
+
+			DynaBuf_Destroy(&buf);
+			MMSMessage_Destroy(&mms);
+		}
+
 
 		db->FreeResult(Config, &res);
 

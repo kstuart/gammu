@@ -6,6 +6,10 @@ project (gammu-smsd C)
 
 set (LIBRARY_SRC
     core.c
+    mms-data.c
+    mms-decoders.c
+    mms-service.c
+    mms-tables.c
     services/files.c
     services/null.c
     )

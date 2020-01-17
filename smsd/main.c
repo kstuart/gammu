@@ -32,6 +32,8 @@
 #include "log-event.h"
 #endif
 
+#include <curl/curl.h>
+
 #if !defined(WIN32)
 #define HAVE_DEFAULT_CONFIG
 const char default_config[] = "/etc/gammu-smsdrc";
@@ -419,7 +421,6 @@ int main(int argc, char **argv)
 	 * charset conversion works.
 	 */
 	GSM_InitLocales(NULL);
-
 	process_commandline(argc, argv, &params);
 
 #ifdef HAVE_WINDOWS_SERVICE
@@ -507,6 +508,8 @@ read_config:
 		SMSD_FreeConfig(config);
 		return 2;
 	}
+
+	curl_global_init(CURL_GLOBAL_ALL);
 	SMSD_EnableGlobalDebug(config);
 
 	if (!reconfigure)
@@ -518,10 +521,11 @@ read_config:
 	if (error != ERR_NONE) {
 		printf("Failed to run SMSD: %s\n", GSM_ErrorString(error));
 		SMSD_FreeConfig(config);
+		curl_global_cleanup();
 		return 2;
 	}
-
 	SMSD_FreeConfig(config);
+	curl_global_cleanup();
 
 	/*
 	 * Wait while we should be suspended.
