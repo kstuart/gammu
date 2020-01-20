@@ -22,16 +22,9 @@
 #include "log.h"
 
 #include "../libgammu/misc/array.h"
+#include "mms-service.h"
 
-typedef struct _DynamicBuffer *DBUFFER;
-
-typedef enum {
-	DEBUG_ERROR = -1,
-	DEBUG_INFO = 0,
-	DEBUG_NOTICE = 1,
-	DEBUG_SQL = 2,
-	DEBUG_GAMMU = 4,
-} SMSD_DebugLevel;
+typedef struct _StreamBuffer *SBUFFER;
 
 typedef enum {
 	SMSD_LOG_NONE,
@@ -76,10 +69,6 @@ typedef struct _Buffer {
 	char *ptr;
 	size_t size;
 } CURLBuffer;
-
-typedef struct _MMSConveyor {
-	GSM_Error (*FetchMMS)(GSM_SMSDConfig*, DBUFFER, GSM_MMSIndicator*);
-} MMSConveyor;
 
 struct _GSM_SMSDConfig {
 	const char	*ServiceName;
@@ -231,7 +220,7 @@ struct _GSM_SMSDConfig {
 	GSM_SMSDStatus *Status;
 	GSM_SMSDService		*Service;
 	MMSConveyor *MMSConveyor;
-	DBUFFER MMSBuffer;
+	SBUFFER MMSBuffer;
 };
 
 extern GSM_Error SMSD_NoneFunction		(void);

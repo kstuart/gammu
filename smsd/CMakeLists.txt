@@ -6,12 +6,14 @@ project (gammu-smsd C)
 
 set (LIBRARY_SRC
     core.c
-    mms-data.c
-    mms-decoders.c
-    mms-service.c
-    mms-tables.c
     services/files.c
     services/null.c
+    mms-data.c
+    mms-decoders.c
+    mms-tables.c
+    mms-service.c
+    mms-mobiledata.c
+    streambuffer.c
     )
 
 if (HAVE_MYSQL_MYSQL_H OR LIBDBI_FOUND OR HAVE_POSTGRESQL_LIBPQ_FE_H OR ODBC_FOUND)

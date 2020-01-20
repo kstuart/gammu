@@ -16,7 +16,6 @@ set (LIBRARY_SRC
     misc/misc.c
     misc/cfg.c
     misc/string.c
-    misc/dynamic-buffer.c
     misc/coding/coding.c
     service/sms/gsmsms.c
     service/sms/gsmems.c

@@ -1,57 +1,20 @@
 #include <malloc.h>
 #include <string.h>
-#include <dynamic-buffer.h>
+#include <assert.h>
+
+#include "log.h"
+#include "streambuffer.h"
 #include "mms-service.h"
+#include "mms-data.h"
 
-MMSError MMS_DecodeFieldValue(CDBUFFER stream, MMSFIELDINFO fi, MMSValue *out)
-{
-	switch(fi->vt) {
-		default:
-			printf("unsupported codec (%d)\n", fi->vt);
-			return MME_NOCODEC;
-		case VT_SHORT_INT:
-			MMS_DecodeShortInteger(stream, out);
-			break;
-		case VT_MESSAGE_TYPE:
-			MMS_MessageTypeDecode(stream, out);
-			break;
-		case VT_TEXT:
-			MMS_DecodeQuoteText(stream, out);
-			break;
-		case VT_LONG_INT:
-			MMS_DecodeLongInteger(stream, out);
-			break;
-		case VT_FROM:
-			MMS_DecodeFromAddress(stream, out);
-			break;
-		case VT_ENCODED_STRING:
-			MMS_DecodeEncodedText(stream, out);
-			break;
-		case VT_MESSAGE_CLASS:
-			MMS_MessageClassDecode(stream, out);
-			break;
-		case VT_PRIORITY:
-			MMS_PriorityDecode(stream, out);
-			break;
-		case VT_YESNO:
-			MMS_YesNoDecode(stream, out);
-			break;
-		case VT_CONTENT_TYPE:
-			MMS_ContentTypeDecode(stream, out);
-			break;
-	}
-
-	return MME_NONE;
-}
-
-MMSHEADER MMS_CreateHeader(CDBUFFER stream, MMSHEADERS headers, MMSFieldType type, MMSFIELDINFO fi)
+MMSHEADER MMS_CreateHeader(SBUFFER stream, MMSHEADERS headers, MMSFieldKind type, MMSFIELDINFO fi)
 {
 	MMSError error;
 	MMSValue value;
 	MMSHEADER header = NULL;
 
 	error = MMS_DecodeFieldValue(stream, fi, &value);
-	if(error != MME_NONE)
+	if(error != MMS_ERR_NONE)
 		return NULL;
 
 	header = MMSHeaders_NewHeader(headers);
@@ -60,20 +23,20 @@ MMSHEADER MMS_CreateHeader(CDBUFFER stream, MMSHEADERS headers, MMSFieldType typ
 		return NULL;
 	}
 
-	header->id.type = type;
+	header->id.kind = type;
 	header->id.info = fi;
 	header->value = value;
 
 	return header;
 }
 
-int MMS_ParseHeaders(CDBUFFER stream, MMSHEADERS headers)
+int MMS_MapEncodedHeaders(SBUFFER stream, MMSHEADERS headers)
 {
 	MMSValue fid;
 	MMSFIELDINFO fi = NULL;
-	MMSFieldType type = MMS_HEADER;
+	MMSFieldKind type = MMS_HEADER;
 
-	while(MMS_DecodeShortInteger(stream, &fid) == MME_NONE) {
+	while(MMS_DecodeShortInteger(stream, &fid) == MMS_ERR_NONE) {
 		fi = MMSFields_FindByID(fid.v.short_int);
 		if(!fi) {
 			fi = WSPFields_FindByID(fid.v.short_int);
@@ -93,50 +56,103 @@ int MMS_ParseHeaders(CDBUFFER stream, MMSHEADERS headers)
 	return 0;
 }
 
-void MMS_DumpHeaders(MMSHEADERS headers, DBUFFER buffer)
-{
-	for(size_t i = 0; i < headers->end; i++) {
-		const char *name = headers->entries[i].id.info->name;
-		const char *value = MMSValue_AsString(headers->entries[i].id.info->id, &headers->entries[i].value);
-		DynaBuf_PutBytes(buffer, name, strlen(name));
-		DynaBuf_PutByte(buffer, '=');
-		DynaBuf_PutBytes(buffer, value, strlen(value));
-		DynaBuf_PutByte(buffer, '\n');
-	}
-	DynaBuf_PutByte(buffer, 0);
-}
-
-MMSError MMS_ParseParts(CDBUFFER stream, MMSPARTS parts)
+MMSError MMS_MapEncodedParts(SBUFFER stream, MMSPARTS parts)
 {
 	size_t num_parts = MMS_DecodeUintVar(stream);
 
 	for(int i = 0; i < num_parts; i++)
 		MMS_CreatePart(stream, parts);
 
-	return MME_NONE;
+	return MMS_ERR_NONE;
 }
 
 
-MMSError MMS_ParseMessage(CDBUFFER stream, MMSMESSAGE *out)
+MMSError MMS_MapEncodedMessage(GSM_SMSDConfig *Config, SBUFFER Stream, MMSMESSAGE *out)
 {
 	MMSError error;
+	MMSHEADERS headers;
 	MMSMESSAGE msg = MMSMessage_Init();
 	if(!msg)
-		return MME_MEMORY;
+		return MMS_ERR_MEMORY;
 
-	error = MMS_ParseHeaders(stream, msg->headers);
-	if(error != MME_NONE) {
+	error = MMS_MapEncodedHeaders(Stream, msg->Headers);
+	if(error != MMS_ERR_NONE) {
 		MMSMessage_Destroy(&msg);
 		return error;
 	}
 
-	error = MMS_ParseParts(stream, msg->parts);
-	if(error != MME_NONE) {
+	headers = msg->Headers;
+	MMSHEADER h = MMSHeader_FindByID(headers, MMS_HEADER, MMS_MESSAGE_TYPE);
+	assert(h && h->value.type == VT_MESSAGE_TYPE);
+	msg->MessageType = h->value.v.enum_v;
+
+	error = MMS_MapEncodedParts(Stream, msg->Parts);
+	if(error != MMS_ERR_NONE) {
 		MMSMessage_Destroy(&msg);
 		return error;
 	}
 
 	*out = msg;
 
-	return MME_NONE;
+	return MMS_ERR_NONE;
+}
+
+void MMS_DumpHeaders(SBUFFER buffer, MMSHEADERS headers)
+{
+	for(size_t i = 0; i < headers->end; i++) {
+		if(headers->entries[i].id.kind != MMS_HEADER)
+			continue;
+
+		const char *name = headers->entries[i].id.info->name;
+		const char *value = MMSValue_AsString(headers->entries[i].id.info->id, &headers->entries[i].value);
+		SB_PutFormattedString(buffer, "%s=%s\n", name, value);
+	}
+}
+
+void SaveSBufferToTempFile(GSM_SMSDConfig *Config, SBUFFER Buffer)
+{
+	char fname[] = "/tmp/GMMS_XXXXXX";
+	int fd = mkstemp(fname);
+	if(fd == -1) {
+		SMSD_LogErrno(Config, "Could not create MMS file");
+		return;
+	}
+
+	SMSD_Log(DEBUG_INFO, Config, "Saving MMS Buffer to: %s", fname);
+
+	ssize_t written = write(fd, SBBase(Buffer), SBUsed(Buffer));
+	close(fd);
+
+	if((size_t)written != SBUsed(Buffer))
+		SMSD_Log(DEBUG_ERROR, Config,
+		         "Failed to flush buffer to file: BufferSize(%zd), BytesWritten(%zu)", SBUsed(Buffer), written);
+}
+
+void MMS_ContentTypeAsString(SBUFFER buffer, MMSContentType *ct)
+{
+	assert(ct);
+	switch(ct->vt) {
+		default:
+			SB_PutString(buffer, "<Unrecognized>");
+			break;
+		case VT_WK_MEDIA:
+			SB_PutString(buffer, ct->v.wk_media->name);
+			break;
+		case VT_TEXT:
+			SB_PutString(buffer, ct->v.ext_media);
+			break;
+	}
+
+	if(ct->params.count) {
+		MMSPARAMETERS p = &ct->params;
+		SB_PutString(buffer, " ");
+		for(int i = 0; i < ct->params.count; i++)
+			SB_PutFormattedString(buffer, "%s=%s, ",
+			  p->entries[i].kind == MMS_PARAM_TYPED ? p->entries[i].v.typed.type->name
+			  : p->entries[i].v.untyped.token_text,
+			  p->entries[i].kind == MMS_PARAM_TYPED ? MMSValue_AsString(-1, &p->entries[i].v.typed.value)
+			  : p->entries->v.untyped.v.text);
+		SB_Truncate(buffer, 2);
+	}
+
 }

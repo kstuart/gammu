@@ -1,0 +1,161 @@
+#include <assert.h>
+#include <curl/curl.h>
+#include "log.h"
+#include "core.h"
+
+#include "streambuffer.h"
+#include "mms-service.h"
+
+gboolean SMSD_RunOn(const char*, GSM_MultiSMSMessage*, GSM_SMSDConfig*, const char*, const char*);
+
+GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
+{
+	assert(Config != NULL);
+	if(Config->RunOnDataConnect == NULL) {
+		SMSD_Log(DEBUG_INFO, Config, "No script provided to register APN.");
+		return ERR_ABORTED;
+	}
+
+	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "start", "data connect");
+	if(success == FALSE) {
+		SMSD_Log(DEBUG_ERROR, Config, "Start APN Registration script failed.");
+		return ERR_ABORTED;
+	}
+	return ERR_NONE;
+}
+
+GSM_Error MobileDataStop(GSM_SMSDConfig *Config)
+{
+	assert(Config && Config->RunOnDataConnect != NULL);
+
+	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "stop", "data disconnect");
+	if(success == FALSE) {
+		SMSD_Log(DEBUG_ERROR, Config, "Stop APN Registration script failed.");
+		return ERR_ABORTED;
+	}
+	return ERR_NONE;
+}
+
+static size_t WriteMemoryCallback(void *in_ptr, size_t size, size_t in_count, void *arg)
+{
+	SBUFFER buffer = (SBUFFER)arg;
+	assert(size == 1);
+
+	SB_PutBytes(buffer, in_ptr, in_count);
+	return in_count;
+}
+
+size_t ReadMemoryCallback(void *ptr, size_t size, size_t nitems, void *arg) {
+	SBUFFER buffer = (SBUFFER)arg;
+	ssize_t bytes_read = SB_GetBytes(buffer, ptr, size * nitems);
+
+	return bytes_read < 0 ? 0 : bytes_read;
+}
+
+static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const char *URL)
+{
+	CURL *ch;
+	CURLcode cr;
+
+	SMSD_Log(DEBUG_INFO, Config, "MMS Address: %s", URL);
+
+	ch = curl_easy_init();
+	if(!ch) {
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to create CURL context");
+		return ERR_ABORTED;
+	}
+
+	curl_easy_setopt(ch, CURLOPT_URL, URL);
+	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)Buffer);
+	cr = curl_easy_perform(ch);
+
+	if(cr != CURLE_OK)
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to fetch URL from server: %s", curl_easy_strerror(cr));
+
+	/* cleanup curl stuff */
+	curl_easy_cleanup(ch);
+
+	return cr == CURLE_OK ? ERR_NONE : ERR_ABORTED;
+}
+
+static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const char *URL)
+{
+	CURL *ch;
+	CURLcode cr;
+	SBUFFER RespBuffer = SB_Init();
+
+	if(!RespBuffer) {
+		SMSD_LogErrno(Config, "Failed to create response buffer");
+		return ERR_MEMORY;
+	}
+
+	ch = curl_easy_init();
+	if(!ch) {
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to create CURL context");
+		return ERR_ABORTED;
+	}
+
+	curl_easy_setopt(ch, CURLOPT_URL, URL);
+	curl_easy_setopt(ch, CURLOPT_POST, 1L);
+	curl_easy_setopt(ch, CURLOPT_READFUNCTION, ReadMemoryCallback);
+	curl_easy_setopt(ch, CURLOPT_READDATA, (void*)Buffer);
+	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)RespBuffer);
+	cr = curl_easy_perform(ch);
+
+	if(cr != CURLE_OK)
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to post MMS to server: %s", curl_easy_strerror(cr));
+
+	/* cleanup curl stuff */
+	curl_easy_cleanup(ch);
+
+	// TODO: process response
+
+	return cr == CURLE_OK ? ERR_NONE : ERR_ABORTED;
+}
+
+GSM_Error FetchMMS(GSM_SMSDConfig *Config, SBUFFER Buffer, GSM_MMSIndicator *MMSIndicator)
+{
+	assert(Config);
+	assert(Buffer);
+	assert(MMSIndicator);
+
+	GSM_Error error = MobileDataStart(Config);
+	if(error != ERR_NONE) {
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to establish APN network.");
+		return error;
+	}
+
+	error = CURL_GetFromURL(Config, Buffer, MMSIndicator->Address);
+	SMSD_Log(DEBUG_INFO, Config, "%lu bytes retrieved from server.", SBUsed(Buffer));
+
+	if(MobileDataStop(Config) != ERR_NONE)
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to disconnect APN network.");
+
+	return error;
+}
+
+GSM_Error SendMMS(GSM_SMSDConfig *Config, SBUFFER Buffer)
+{
+	assert(Config);
+	assert(Buffer);
+
+	GSM_Error error = MobileDataStart(Config);
+	if(error != ERR_NONE) {
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to establish APN network.");
+		return error;
+	}
+
+	error = CURL_PostToURL(Config, Buffer, Config->MMSCAddress);
+
+	if(MobileDataStop(Config) != ERR_NONE)
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to disconnect APN network.");
+
+	return error;
+}
+
+MMSConveyor MMSMobileDataConveyor = {
+	FetchMMS,
+	SendMMS,
+};

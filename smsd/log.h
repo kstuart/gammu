@@ -5,6 +5,14 @@
 
 #include <gammu-smsd.h>
 
+typedef enum {
+	DEBUG_ERROR = -1,
+	DEBUG_INFO = 0,
+	DEBUG_NOTICE = 1,
+	DEBUG_SQL = 2,
+	DEBUG_GAMMU = 4,
+} SMSD_DebugLevel;
+
 /**
  * Logs a message to SMSD log.
  *

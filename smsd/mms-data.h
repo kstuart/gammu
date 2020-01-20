@@ -4,29 +4,32 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct _DynamicBuffer *CDBUFFER;
+#define MMS_MAX_PARAMS 10
 
+typedef struct _StreamBuffer *SBUFFER;
 
 typedef uint8_t BYTE;
 typedef uint8_t *PBYTE;
+typedef const uint8_t *CPTR;
 
 typedef char *STR;
 typedef const char *CSTR;
-typedef const char *CPTR;
 
 typedef uint8_t MMSShortInt;
 typedef uint32_t MMSLongInt;
 
 typedef enum _MMSError {
-	MME_NONE,
-	MME_INVALID_DATA,
-	MME_INVALID_VALUE,
-	MME_OUTOFRANGE,
-	MME_BADLENGTH,
-	MME_NOCODEC,
-	MME_LOOKUP_FAILED,
-	MME_MEMORY,
-	MME_UNIMPLEMENTED,
+	MMS_ERR_NONE,
+	MMS_ERR_INVALID_DATA,
+	MMS_ERR_INVALID_VALUE,
+	MMS_ERR_INVALID_PARAM,
+	MMS_ERR_OUTOFRANGE,
+	MMS_ERR_BADLENGTH,
+	MMS_ERR_NOCODEC,
+	MMS_ERR_LOOKUP_FAILED,
+	MMS_ERR_MEMORY,
+	MMS_ERR_UNSUPPORTED,
+	MMS_ERR_UNIMPLEMENTED,
 } MMSError;
 
 enum {
@@ -39,29 +42,10 @@ enum {
 	TEXT_QUOTE = 127,
 };
 
-typedef struct _MMSValueEnum {
-	const char *name;
-	int code;
-} MMSValueEnum;
-
-typedef MMSValueEnum *MMSVALUEENUM;
-
-typedef struct _Charset {
-	const char *Name;
-	const int MIBenum;
-} Charset;
-
-typedef Charset *CHARSET;
-
-typedef struct _EncodedString {
-	MMSVALUEENUM charset;
-	PBYTE string;
-} EncodedString;
-
-typedef enum _MMSFieldType {
-	WSP_HEADER,
-	MMS_HEADER
-} MMSFieldType;
+typedef enum _MMSFieldKind {
+	WSP_HEADER = 0x01,
+	MMS_HEADER = 0x02
+} MMSFieldKind;
 
 typedef enum _MMSValueType {
 	VT_NONE,
@@ -172,34 +156,47 @@ enum MMSFieldID {
 	MMS_TRANSACTION_ID = 0x18
 };
 
+typedef struct _MMSValueEnum {
+	const char *name;
+	int code;
+} MMSValueEnum;
+
+typedef MMSValueEnum *MMSVALUEENUM;
+
+typedef struct _Charset {
+	const char *Name;
+	const int id;
+} Charset;
+
+typedef Charset *CHARSET;
+
+typedef struct _EncodedString {
+	MMSVALUEENUM charset;
+	PBYTE string;
+} EncodedString;
+
 typedef struct _MMSFieldInfo {
 	const int id;
 	const char *name;
 	MMSValueType vt;
 } MMSFieldInfo;
-
 typedef MMSFieldInfo *MMSFIELDINFO;
 
-typedef struct _TypedParam {
-	MMSValueType value_type;
-	MMSLongInt token;
-	union {
-		MMSLongInt integer;
-	} v;
-} TypedParam;
+typedef struct _MMSParameter *MMSPARAMETER;
 
-typedef struct _UntypedParam {
-	MMSValueType value_type;
-	STR token_text;
-	union {
-		MMSLongInt integer;
-		STR text;
-	} v;
-} UntypedParam;
-
+typedef struct _MMSParameters {
+	int count;
+	MMSPARAMETER entries;
+} MMSParameters;
+typedef MMSParameters *MMSPARAMETERS;
 
 typedef struct _MMSContentType {
-	MMSVALUEENUM wk_media;
+	MMSValueType vt;
+	union {
+		MMSVALUEENUM wk_media;
+		STR ext_media;
+	} v;
+	MMSParameters params;
 } MMSContentType;
 
 typedef struct _MMSValue {
@@ -215,11 +212,37 @@ typedef struct _MMSValue {
 		MMSContentType content_type;
 	} v;
 } MMSValue;
-
 typedef MMSValue *MMSVALUE;
 
+typedef struct _TypedParam {
+	MMSFIELDINFO type;
+	MMSValue value;
+} TypedParam;
+
+typedef struct _UntypedParam {
+	MMSValueType value_type;
+	STR token_text;
+	union {
+		MMSLongInt integer;
+		STR text;
+	} v;
+} UntypedParam;
+
+typedef enum _MMSParameterKind {
+	MMS_PARAM_TYPED,
+	MMS_PARAM_UNTYPED,
+} MMSParameterKind;
+
+typedef struct _MMSParameter {
+	MMSParameterKind kind;
+	union {
+		TypedParam typed;
+		UntypedParam untyped;
+	} v;
+} MMSParameter;
+
 typedef struct _MMSFieldID {
-	int type;
+	MMSFieldKind kind;
 	MMSFIELDINFO info;
 } MMSFieldID;
 
@@ -227,7 +250,6 @@ typedef struct _MMSHeader {
 	MMSFieldID id;
 	MMSValue value;
 } MMSHeader;
-
 typedef MMSHeader *MMSHEADER;
 
 typedef struct _MMSHeaders {
@@ -235,14 +257,13 @@ typedef struct _MMSHeaders {
 	size_t end;
 	MMSHEADER entries;
 } MMSHeaders;
-
 typedef MMSHeaders *MMSHEADERS;
 
 // WSP 8.5 Application/vnd.wap.multipart
 typedef struct _MMSPart {
 	MMSHEADERS headers;
-	PBYTE data;
 	size_t data_len;
+	PBYTE data;
 } MMSPart;
 typedef MMSPart *MMSPART;
 
@@ -253,10 +274,10 @@ typedef struct _MMSParts {
 } MMSParts;
 typedef MMSParts *MMSPARTS;
 
-
 typedef struct _MMSMessage {
-	MMSHEADERS headers;
-	MMSPARTS parts;
+	MMSVALUEENUM MessageType;
+	MMSHEADERS Headers;
+	MMSPARTS Parts;
 } MMSMessage;
 typedef MMSMessage *MMSMESSAGE;
 
@@ -269,17 +290,17 @@ MMSHEADERS MMSHeaders_InitWithCapacity(int num_headers);
 void MMSHeaders_Destroy(MMSHEADERS *headers);
 MMSHEADER MMSHeaders_NewHeader(MMSHEADERS headers);
 int MMSHeaders_GrowNumEntries(MMSHEADERS headers, int delta);
-MMSHEADER MMSHeader_FindByID(MMSHEADERS headers, MMSFieldType type, int fieldId);
-
+MMSHEADER MMSHeader_FindByID(MMSHEADERS headers, MMSFieldKind type, int fieldId);
 
 int MMSParts_GrowNumEntries(MMSPARTS parts, int delta);
 MMSPARTS MMSParts_InitWithCapacity(int num_parts);
-void MMSPart_Destroy(MMSPART *part);
 void MMSParts_Destroy(MMSPARTS *parts);
 MMSPART MMSParts_NewPart(MMSPARTS parts);
-MMSPART MMS_CreatePart(CDBUFFER stream, MMSPARTS parts);
+MMSPART MMS_CreatePart(SBUFFER stream, MMSPARTS parts);
 
-MMSMESSAGE MMSMessage_Init();
+void MMSPart_Destroy(MMSPART *part);
+
+MMSMESSAGE MMSMessage_Init(void);
 void MMSMessage_Destroy(MMSMESSAGE *message);
 
 #endif //GAMMU_MMS_DATA_H

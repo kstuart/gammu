@@ -40,8 +40,10 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include <dynamic-buffer.h>
-#include <curl/curl.h>
+#include "streambuffer.h"
+#include "mms-service.h"
+#include "mms-mobiledata.h"
+
 #define MMS_INIT_BUFFER_SIZE (1024*4)
 
 /* Some systems let waitpid(2) tell callers about stopped children. */
@@ -75,8 +77,7 @@
 #endif
 #endif
 
-/* MMS services backends */
-extern struct _MMSConveyor MMSMobileDataConveyor;
+
 
 GSM_Error SMSD_ProcessSMSInfoCache(GSM_SMSDConfig *Config);
 
@@ -452,7 +453,7 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 	}
 
 	Config->MMSConveyor = &MMSMobileDataConveyor;
-	Config->MMSBuffer =	DynaBuf_InitWithCapacity(MMS_INIT_BUFFER_SIZE);
+	Config->MMSBuffer = SB_InitWithCapacity(MMS_INIT_BUFFER_SIZE);
 
 	return Config;
 }
@@ -533,7 +534,7 @@ void SMSD_FreeConfig(GSM_SMSDConfig *Config)
 	GSM_StringArray_Free(&(Config->IncludeSMSCList));
 	GSM_StringArray_Free(&(Config->ExcludeSMSCList));
 
-	DynaBuf_Destroy(&Config->MMSBuffer);
+	SB_Destroy(&Config->MMSBuffer);
 
 	free(Config->gammu_log_buffer);
 
@@ -1380,153 +1381,46 @@ gboolean SMSD_ValidMessage(GSM_SMSDConfig *Config, GSM_MultiSMSMessage *sms)
 	return TRUE;
 }
 
-GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
+GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
 {
-	assert(Config != NULL);
-	if(Config->RunOnDataConnect == NULL) {
-		SMSD_Log(DEBUG_INFO, Config, "No script provided to register APN.");
-		return ERR_ABORTED;
-	}
-
-	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "start", "data connect");
-	if(success == FALSE) {
-		SMSD_Log(DEBUG_ERROR, Config, "Start APN Registration script failed.");
-		return ERR_ABORTED;
-	}
-	return ERR_NONE;
-}
-
-GSM_Error MobileDataStop(GSM_SMSDConfig *Config)
-{
-	assert(Config && Config->RunOnDataConnect != NULL);
-
-	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "stop", "data disconnect");
-	if(success == FALSE) {
-		SMSD_Log(DEBUG_ERROR, Config, "Stop APN Registration script failed.");
-		return ERR_ABORTED;
-	}
-	return ERR_NONE;
-}
-
-
-static size_t WriteMemoryCallback(void *in_ptr, size_t size, size_t in_count, void *arg)
-{
-	DBUFFER buffer = (DBUFFER)arg;
-	assert(size == 1);
-
-	DynaBuf_PutBytes(buffer, in_ptr, in_count);
-	return in_count;
-}
-
-GSM_Error CURL_GetURL(GSM_SMSDConfig *Config, DBUFFER Buffer, const char *URL)
-{
-	CURL *ch;
-	CURLcode cr;
-
-	SMSD_Log(DEBUG_INFO, Config, "MMS Address: %s", URL);
-
-	ch = curl_easy_init();
-	curl_easy_setopt(ch, CURLOPT_URL, URL);
-	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)Buffer);
-	cr = curl_easy_perform(ch);
-
-	if(cr != CURLE_OK)
-		SMSD_Log(DEBUG_ERROR, Config, "Failed to fetch URL from server: %s", curl_easy_strerror(cr));
-
-	/* cleanup curl stuff */
-	curl_easy_cleanup(ch);
-
-	return cr == CURLE_OK ? ERR_NONE : ERR_ABORTED;
-}
-
-GSM_Error MMSMobileData_FetchMMS(GSM_SMSDConfig *Config, DBUFFER Buffer, GSM_MMSIndicator *MMSIndicator)
-{
-	assert(Config != NULL);
-	assert(MMSIndicator != NULL);
-
-	GSM_Error error = MobileDataStart(Config);
-	if(error != ERR_NONE) {
-		SMSD_Log(DEBUG_ERROR, Config, "Failed to establish APN network.");
-		return error;
-	}
-
-	error = CURL_GetURL(Config, Buffer, MMSIndicator->Address);
-	SMSD_Log(DEBUG_INFO, Config, "%lu bytes retrieved from server.", DynaBufUsed(Buffer));
-
-
-	if(MobileDataStop(Config) != ERR_NONE)
-		SMSD_Log(DEBUG_ERROR, Config, "Failed to disconnect APN network.");
-
-	return error;
-}
-
-MMSConveyor MMSMobileDataConveyor = {
-	MMSMobileData_FetchMMS
-};
-
-void SaveMMSBufferToFile(GSM_SMSDConfig *Config, DBUFFER Buffer)
-{
-	char fname[] = "/tmp/GMMS_XXXXXX";
-	int fd = mkstemp(fname);
-	if(fd == -1) {
-		SMSD_LogErrno(Config, "Could not create MMS file");
-		return;
-	}
-
-	SMSD_Log(DEBUG_INFO, Config, "Saving MMS Buffer to: %s", fname);
-
-	ssize_t written = write(fd, DynaBufBase(Buffer), DynaBufUsed(Buffer));
-	close(fd);
-
-	if((size_t)written != DynaBufUsed(Buffer))
-		SMSD_Log(DEBUG_ERROR, Config,
-			"Failed to flush buffer to file: BufferSize(%zd), BytesWritten(%zu)", DynaBufUsed(Buffer),	written);
-}
-
-GSM_Error SMSD_RetrieveMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
-{
-	assert(Config != NULL);
-	assert(MMSIndicator != NULL);
-
-	DBUFFER Buffer = Config->MMSBuffer;
 	GSM_Error error;
+	SBUFFER Buffer = Config->MMSBuffer;
 
-	assert(Buffer != NULL);
-	DynaBuf_MinCapacity(Buffer, MMSIndicator->MessageSize);
+	assert(Config);
+	assert(MMSIndicator);
+	assert(Buffer);
+
+	SB_MinCapacity(Buffer, MMSIndicator->MessageSize);
 
 	error = Config->MMSConveyor->FetchMMS(Config, Buffer, MMSIndicator);
 	if(error != ERR_NONE)
 		SMSD_LogError(DEBUG_ERROR, Config, "Failed to process MMS", error);
 
-	DynaBuf_Seek(Buffer, 0, SEEK_SET);
-
 #ifdef DEBUG
 	if(error == ERR_NONE)
-		SaveMMSBufferToFile(Config, Buffer);
+		SaveSBufferToTempFile(Config, Buffer);
 #endif
 
 	return error;
 }
 
-GSM_Error SMSD_FromLocationsGetLastID(GSM_SMSDConfig *Config, const char *locations, unsigned long long *id)
+GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config)
 {
-	unsigned long long last_id;
-	const char *pos = locations + strlen(locations) - 2;
-	while(*pos != ' ' && pos != locations) pos--;
+	GSM_Error error;
+	SBUFFER Buffer = Config->MMSBuffer;
 
-	last_id = strtoll(pos, NULL, 10);
-	if(last_id == 0 && errno == EINVAL) {
-		SMSD_LogErrno(Config, "Failed to get inbox id of last SMS");
-		return ERR_INVALIDDATA;
-	}
+	assert(Config);
+  assert(Buffer);
 
-	*id = last_id;
-	return ERR_NONE;
+	error = Config->MMSConveyor->SendMMS(Config, Config->MMSBuffer);
+	if(error != ERR_NONE)
+		SMSD_LogError(DEBUG_ERROR, Config, "Failed to process MMS", error);
+
+	SB_Seek(Buffer, 0, SEEK_SET);
 }
 
 /**
- * Does any processing is required for single message after it has been accepted.
+ * Does any processing required for single message after it has been accepted.
  *
  * Stores message in the backend and executes RunOnReceive.
  */
@@ -1534,28 +1428,11 @@ unsigned long long SMSD_ProcessSMS(GSM_SMSDConfig *Config, GSM_MultiSMSMessage *
 {
 	GSM_Error error = ERR_NONE;
 	char *locations = NULL;
-//	GSM_MultiPartSMSInfo SMSInfo;
-//	unsigned long long inbox_id;
 
 	/* Increase message counter */
 	Config->Status->Received += sms->Number;
 	/* Send message to the backend */
 	error = Config->Service->SaveInboxSMS(sms, Config, &locations);
-//
-//	/* Process any MMS attachments */
-//	if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
-//		SMSD_FromLocationsGetLastID(Config, locations, &inbox_id);
-//	  for (int i = 0; i < SMSInfo.EntriesNum; i++) {
-//		  if(SMSInfo.Entries[i].ID == SMS_MMSIndicatorLong) {
-//		  	error = SMSD_ProcessMMS(Config, SMSInfo.Entries[0].MMSIndicator);
-//		  	if(error != ERR_NONE) {
-//					SMSD_LogError(DEBUG_ERROR, Config, "Failed to process MMS", error);
-//		  	}
-//		  }
-//	  }
-//	  GSM_FreeMultiPartSMSInfo(&SMSInfo);
-//  }
-//
 	/* RunOnReceive handling */
 	if (Config->RunOnReceive != NULL && error == ERR_NONE) {
 		SMSD_RunOn(Config->RunOnReceive, sms, Config, locations, "receive");

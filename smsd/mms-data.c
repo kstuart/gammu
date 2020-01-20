@@ -1,14 +1,16 @@
 #include <malloc.h>
 #include <string.h>
 #include <limits.h>
-#include <dynamic-buffer.h>
+#include "streambuffer.h"
 #include <time.h>
+#include <assert.h>
 
 #include "mms-data.h"
 #include "mms-decoders.h"
 #include "mms-tables.h"
+#include "mms-service.h"
 
-typedef enum _IntToStringFMT {
+typedef enum _IntToStringFmt {
 	FMT_DECIMAL,
 	FMT_HEX
 } IntToStringFmt;
@@ -17,6 +19,7 @@ const char *IntToStr(unsigned long i, IntToStringFmt fmt)
 {
 	static char buf[(CHAR_BIT * sizeof(unsigned long) - 1) / 3 + 2];
 	switch(fmt) {
+		default:
 		case FMT_DECIMAL:
 			snprintf(buf, sizeof(buf), "%zu", i);
 			break;
@@ -61,7 +64,10 @@ CSTR MMSValue_AsString(int field_id, MMSValue *v)
 		case VT_HIDESHOW:
 		case VT_RESPONSE_STATUS:
 		case VT_PRIORITY:
+		case VT_WK_CHARSET:
 			return v->v.enum_v->name;
+		case VT_CONTENT_TYPE:
+			return "";
 	}
 }
 
@@ -70,18 +76,30 @@ MMSError MMSValue_SetEnum(MMSVALUE out, MMSValueType vt, MMSVALUEENUM entry)
 	out->allocated = 0;
 	out->type = vt;
 	out->v.enum_v = entry;
-	return MME_NONE;
+	return MMS_ERR_NONE;
+}
+
+void MMSValue_Destroy(MMSVALUE value)
+{
+	if(value->type == VT_CONTENT_TYPE) {
+		if(value->v.content_type.params.count) {
+			free(value->v.content_type.params.entries);
+			value->v.content_type.params.entries = NULL;
+			value->v.content_type.params.count = 0;
+		}
+	}
+
+	if(value->allocated) {
+		free(value->v.ptr);
+		value->v.ptr = NULL;
+	}
 }
 
 // MMSHeader
 
 void MMSHeader_Clear(MMSHEADER header)
 {
-	if(!header->value.allocated)
-		return;
-
-	free(header->value.v.ptr);
-	header->value.v.ptr = NULL;
+	MMSValue_Destroy(&header->value);
 }
 
 // MMSHeaders
@@ -134,13 +152,13 @@ MMSHEADER MMSHeaders_NewHeader(MMSHEADERS headers)
 	return &headers->entries[headers->end++];
 }
 
-MMSHEADER MMSHeader_FindByID(MMSHEADERS headers, MMSFieldType type, int fieldId)
+MMSHEADER MMSHeader_FindByID(MMSHEADERS headers, MMSFieldKind type, int fieldId)
 {
 	MMSHEADER header;
 
-	for(int i = 0; i < headers->end; i++) {
+	for(size_t i = 0; i < headers->end; i++) {
 		header = &headers->entries[i];
-		if (header->id.type == type && header->id.info->id == fieldId)
+		if (header->id.kind == type && header->id.info->id == fieldId)
 			return header;
 	}
 
@@ -209,17 +227,18 @@ MMSPART MMSParts_NewPart(MMSPARTS parts)
 	return part;
 }
 
-MMSPART MMS_CreatePart(CDBUFFER stream, MMSPARTS parts)
+MMSPART MMS_CreatePart(SBUFFER stream, MMSPARTS parts)
 {
 	MMSError error;
 	size_t headers_len = MMS_DecodeUintVar(stream);
 	size_t data_len = MMS_DecodeUintVar(stream);
-
-	size_t temp_mark = DynaBufOffset(stream);
-
 	MMSValue v;
+
+	long mark = SBOffset(stream);
+	const char *headers_end = SBPtr(stream) + headers_len;
+
 	error = MMS_ContentTypeDecode(stream, &v);
-	if(error != MME_NONE)
+	if(error != MMS_ERR_NONE)
 		return NULL;
 
 	MMSPART part = MMSParts_NewPart(parts);
@@ -227,16 +246,24 @@ MMSPART MMS_CreatePart(CDBUFFER stream, MMSPARTS parts)
 		return NULL;
 
 	MMSHEADER header = MMSHeaders_NewHeader(part->headers);
-	header->id.type = MMS_HEADER;
+	header->id.kind = MMS_HEADER;
 	header->id.info = MMSFields_FindByID(MMS_CONTENT_TYPE);
 	header->value = v;
 
-	// TODO: parse remaining headers once content type decoding is complete, skip for now.
-	DynaBuf_Seek(stream, (long)(temp_mark + headers_len), SEEK_SET);
-	part->data_len = data_len;
-	part->data = DynaBufPtr(stream);
+	// FIXME: Buggy
+	if(SBPtr(stream) < headers_end)
+		MMS_MapEncodedHeaders(stream, part->headers);
 
-	DynaBuf_Seek(stream, data_len, SEEK_CUR);
+	// NOTE: shouldn't be needed if all headers parsed
+	if(SBPtr(stream) != headers_end)
+		SB_Seek(stream, mark + (int)headers_len, SEEK_SET);
+
+	assert(SBPtr(stream) == headers_end);
+
+	part->data_len = data_len;
+	part->data = SBPtr(stream);
+
+	SB_Seek(stream, data_len, SEEK_CUR);
 
 	return part;
 }
@@ -248,15 +275,15 @@ MMSMESSAGE MMSMessage_Init()
 		return NULL;
 
 	memset(msg, 0, sizeof(MMSMessage));
-	msg->headers = MMSHeaders_InitWithCapacity(10);
-	if(!msg->headers) {
+	msg->Headers = MMSHeaders_InitWithCapacity(10);
+	if(!msg->Headers) {
 		free(msg);
 		return NULL;
 	}
 
-	msg->parts = MMSParts_InitWithCapacity(3);
-	if(!msg->parts) {
-		MMSHeaders_Destroy(&msg->headers);
+	msg->Parts = MMSParts_InitWithCapacity(3);
+	if(!msg->Parts) {
+		MMSHeaders_Destroy(&msg->Headers);
 		free(msg);
 		return NULL;
 	}
@@ -266,7 +293,7 @@ MMSMESSAGE MMSMessage_Init()
 
 void MMSMessage_Destroy(MMSMESSAGE *message)
 {
-	MMSHeaders_Destroy(&(*message)->headers);
-	MMSParts_Destroy(&(*message)->parts);
+	MMSHeaders_Destroy(&(*message)->Headers);
+	MMSParts_Destroy(&(*message)->Parts);
 }
 

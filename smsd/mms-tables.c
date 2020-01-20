@@ -1,17 +1,9 @@
 #include <string.h>
-#include <dynamic-buffer.h>
+#include "streambuffer.h"
+#include <assert.h>
 #include "mms-data.h"
 
-MMSVALUEENUM MMSEnumLookupByName(MMSVALUEENUM tbl, int count, CSTR name)
-{
-	for(int i = 0; i < count; i++)
-		if(strcmp(name, tbl[i].name) == 0)
-			return &tbl[i];
-
-	return NULL;
-}
-
-MMSVALUEENUM MMSEnumLookupByID(MMSVALUEENUM tbl, int count, MMSShortInt value)
+static MMSVALUEENUM _EnumLookupByID(MMSVALUEENUM tbl, int count, MMSShortInt value)
 {
 	for(int i = 0; i < count; i++)
 		if(tbl[i].code == value)
@@ -20,9 +12,10 @@ MMSVALUEENUM MMSEnumLookupByID(MMSVALUEENUM tbl, int count, MMSShortInt value)
 	return NULL;
 }
 
-
-MMSVALUEENUM MMSEncodedEnumQuickLookup(MMSVALUEENUM tbl, int count, MMSShortInt value)
+static MMSVALUEENUM _EncodedEnumQuickLookup(MMSVALUEENUM tbl, int count, MMSShortInt value)
 {
+	assert(value & 0x80u);
+
 	MMSShortInt idx = value & 0x7fu;
 	if(idx > count || idx < 0)
 		return NULL;
@@ -33,19 +26,6 @@ MMSVALUEENUM MMSEncodedEnumQuickLookup(MMSVALUEENUM tbl, int count, MMSShortInt 
 
 	return entry;
 }
-
-MMSError _EnumLookup(CDBUFFER stream, MMSVALUE out, MMSValueType vt, MMSVALUEENUM tbl, int count)
-{
-	MMSShortInt code;
-	code = DynaBuf_NextByte(stream);
-
-	MMSVALUEENUM entry = MMSEncodedEnumQuickLookup(tbl, count, code);
-	if(!entry)
-		return MME_OUTOFRANGE;
-
-	return MMSValue_SetEnum(out, vt, entry);
-}
-
 
 MMSFieldInfo WSPFields[] = {
 	{WSP_ACCEPT,               "Accept",               VT_UNSUPPORTED},
@@ -164,13 +144,13 @@ MMSFieldInfo MMSWellKnownParams[] = {
 	{0x02, "level",       VT_UNSUPPORTED},
 	{0x03, "type",        VT_UNSUPPORTED},
 	{0x04, "uaprof",      VT_UNSUPPORTED},
-	{0x05, "name",        VT_UNSUPPORTED},
+	{0x05, "name",        VT_TEXT},
 	{0x06, "filename",    VT_UNSUPPORTED},
 	{0x07, "differences", VT_UNSUPPORTED},
 	{0x08, "padding",     VT_UNSUPPORTED},
 };
 
-MMSFIELDINFO MMSWellKnownParams_FindByID(int id)
+MMSFIELDINFO MMS_WellKnownParams_FindByID(int id)
 {
 	static const size_t limit = sizeof(MMSWellKnownParams) / sizeof(MMSWellKnownParams[0]);
 	MMSFIELDINFO fi;
@@ -185,15 +165,15 @@ MMSFIELDINFO MMSWellKnownParams_FindByID(int id)
 
 // https://www.iana.org/assignments/character-sets/character-sets.xhtml
 MMSValueEnum MMSCharsetEnum[] = {
-	{"*",        0},
 	{"US-ASCII", 3},
-	{"UTF-8",    106}
+	{"UTF-8",    106},
+	{"*",        127},
 };
 size_t MMSCharsetEnumSize = sizeof(MMSCharsetEnum) / sizeof(MMSCharsetEnum[0]);
 
-MMSVALUEENUM Charset_FindByID(int id)
+MMSVALUEENUM MMS_Charset_FindByID(int id)
 {
-	return MMSEnumLookupByID(MMSCharsetEnum, MMSCharsetEnumSize, id);
+	return _EnumLookupByID(MMSCharsetEnum, MMSCharsetEnumSize, id);
 }
 
 // http://openmobilealliance.org/wp/OMNA/wsp/wsp_content_type_codes.html
@@ -282,5 +262,57 @@ size_t WkContentTypesSize = sizeof(WKContentTypes) / sizeof(WKContentTypes[0]);
 
 MMSVALUEENUM MMS_WkContentType_FindByID(int id)
 {
-	return MMSEnumLookupByID(WKContentTypes, WkContentTypesSize, id);
+	return _EnumLookupByID(WKContentTypes, WkContentTypesSize, id);
+}
+
+MMSValueEnum MMSMessageTypeEnum[] = {
+	{"m-send-req", 128},
+	{"m-send-conf", 129},
+	{"m-notification-ind", 130},
+	{"m-notifyresp-ind", 131},
+	{"m-retrieve-conf", 132},
+	{"m-acknowledge-ind", 133},
+	{"m-delivery-ind", 134},
+};
+size_t MMSMessageTypeEnumSize = sizeof(MMSMessageTypeEnum) / sizeof(MMSMessageTypeEnum[0]);
+
+MMSVALUEENUM MMS_MessageType_FindByID(int id)
+{
+	return _EncodedEnumQuickLookup(MMSMessageTypeEnum, MMSMessageTypeEnumSize, id);
+}
+
+MMSValueEnum MMSMessageClassEnum[] = {
+	{"Personal", 128},
+	{"Advertisement", 129},
+	{"Informational", 130},
+	{"Auto", 131},
+};
+size_t MMSMessageClassEnumSize = sizeof(MMSMessageClassEnum) / sizeof(MMSMessageClassEnum[0]);
+
+MMSVALUEENUM MMS_MessageClass_FindByID(int id)
+{
+	return _EncodedEnumQuickLookup(MMSMessageClassEnum, MMSMessageClassEnumSize, id);
+}
+
+MMSValueEnum MMSPriorityEnum[] = {
+	{"Low", 128},
+	{"Normal", 129},
+	{"High", 130},
+};
+size_t MMSPriorityEnumSize = sizeof(MMSPriorityEnum) / sizeof(MMSPriorityEnum[0]);
+
+MMSVALUEENUM MMS_Priority_FindByID(int id)
+{
+	return _EncodedEnumQuickLookup(MMSPriorityEnum, MMSPriorityEnumSize, id);
+}
+
+MMSValueEnum MMSYesNoEnum[] = {
+	{ "Yes", 128 },
+	{ "No", 129 },
+};
+size_t MMSYesNoEnumSize = sizeof(MMSYesNoEnum) / sizeof(MMSYesNoEnum[0]);
+
+MMSVALUEENUM MMS_YesNo_FindByID(int id)
+{
+	return _EncodedEnumQuickLookup(MMSYesNoEnum, MMSYesNoEnumSize, id);
 }
