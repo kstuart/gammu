@@ -781,7 +781,6 @@ GSM_Error SaveMMS(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIn
 
 	SB_Destroy(&buf);
 	MMSMessage_Destroy(&mms);
-	SB_Clear(Config->MMSBuffer);
 
 	return error;
 }
