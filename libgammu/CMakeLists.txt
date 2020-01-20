@@ -128,7 +128,8 @@ else(MSVC)
 endif(MSVC)
 
 if (CURL_FOUND)
-    target_link_libraries (libGammu CURL::libcurl)
+    target_link_libraries (libGammu ${CURL_LIBRARIES})
+    include_directories (${CURL_INCLUDE_DIR})
 endif (CURL_FOUND)
 
 add_coverage (libGammu)
