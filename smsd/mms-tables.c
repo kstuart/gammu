@@ -165,9 +165,21 @@ MMSFIELDINFO MMS_WellKnownParams_FindByID(int id)
 
 // https://www.iana.org/assignments/character-sets/character-sets.xhtml
 MMSValueEnum MMSCharsetEnum[] = {
-	{"US-ASCII", 3},
-	{"UTF-8",    106},
-	{"*",        127},
+	{"US-ASCII",        3},
+	{"UTF-8",           106},
+	{"*",               127},
+	{"big5",            0x07EA},
+	{"iso-10646-ucs-2", 0x03E8},
+	{"iso-8859-1",      0x04},
+	{"iso-8859-2",      0x05},
+	{"iso-8859-3",      0x06},
+	{"iso-8859-4",      0x07},
+	{"iso-8859-5",      0x08},
+	{"iso-8859-6",      0x09},
+	{"iso-8859-7",      0x0A},
+	{"iso-8859-8",      0x0B},
+	{"iso-8859-9",      0x0C},
+	{"shift_JIS",       0x11},
 };
 size_t MMSCharsetEnumSize = sizeof(MMSCharsetEnum) / sizeof(MMSCharsetEnum[0]);
 
