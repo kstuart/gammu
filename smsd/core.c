@@ -419,6 +419,7 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 	Config->RunOnIncomingCall = NULL;
 	Config->RunOnDataConnect = NULL;
 	Config->MMSCAddress = NULL;
+	Config->MMSCProxy = NULL;
 	Config->smsdcfgfile = NULL;
 	Config->log_handle = NULL;
 	Config->log_type = SMSD_LOG_NONE;
@@ -895,6 +896,7 @@ GSM_Error SMSD_ReadConfig(const char *filename, GSM_SMSDConfig *Config, gboolean
 	Config->RunOnIncomingCall = INI_GetValue(Config->smsdcfgfile, "smsd", "runonincomingcall", FALSE);
 	Config->RunOnDataConnect = INI_GetValue(Config->smsdcfgfile, "smsd", "runondataconnect", FALSE);
 	Config->MMSCAddress = INI_GetValue(Config->smsdcfgfile, "smsd", "mmsc_address", FALSE);
+	Config->MMSCProxy = INI_GetValue(Config->smsdcfgfile, "smsd", "mmsc_proxy", FALSE);
 
 	str = INI_GetValue(Config->smsdcfgfile, "smsd", "smsc", FALSE);
 	if (str) {

@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/bash
 ## Script: mobile_connect [establishes modem PPP network]
 ## Version: 0.1.0
 ## Created: 20191227

@@ -99,6 +99,9 @@ static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const c
 	curl_easy_setopt(ch, CURLOPT_URL, URL);
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)Buffer);
+	if(Config->MMSCProxy) {
+		curl_easy_setopt(ch, CURLOPT_PROXY, Config->MMSCProxy);
+	}
 	if(Config->debug_level > 0) {
 		curl_easy_setopt(ch, CURLOPT_DEBUGFUNCTION, CURL_DebugLogger);
 		curl_easy_setopt(ch, CURLOPT_DEBUGDATA, Config);
@@ -138,6 +141,9 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const ch
 	curl_easy_setopt(ch, CURLOPT_READDATA, (void*)Buffer);
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)RespBuffer);
+	if(Config->MMSCProxy) {
+		curl_easy_setopt(ch, CURLOPT_PROXY, Config->MMSCProxy);
+	}
 	if(Config->debug_level > 0) {
 		curl_easy_setopt(ch, CURLOPT_DEBUGFUNCTION, CURL_DebugLogger);
 		curl_easy_setopt(ch, CURLOPT_DEBUGDATA, Config);

@@ -90,6 +90,7 @@ struct _GSM_SMSDConfig {
 	const char   *RunOnIncomingCall; /* run this command when a phone call has been canceled */
 	const char *RunOnDataConnect; /* run this command to start/stop mobile data connection (PPP) */
 	const char *MMSCAddress; /* MMS Service Provider (MMSC) http address */
+	const char *MMSCProxy; /* MMS Service Provider Proxy URL */
 	gboolean checksecurity;
 	gboolean hangupcalls;
 	gboolean checkbattery;
