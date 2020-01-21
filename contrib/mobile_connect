@@ -61,14 +61,12 @@ DEFAULT_ROUTE_FILE - File in which to save the default route
                      from the mobile network.
 EOF
 
-usage()
-{
+usage() {
   echo "$HELP"
   exit 0
 }
 
-wait_for_ppp_up()
-{
+wait_for_ppp_up() {
   echo "Waiting for network setup..."
   while true; do
     MobileRoute=$(ip route | grep "ppp0" | cut -d" " -f1)
@@ -77,10 +75,9 @@ wait_for_ppp_up()
   done
 }
 
-wait_for_ppp_down()
-{
+wait_for_ppp_down() {
   while true; do
-    if [ -e /sys/class/net/ppp0 ] ; then
+    if [ -e /sys/class/net/ppp0 ]; then
       sleep 1
     else
       echo "Succesfully disconnected."
@@ -89,9 +86,8 @@ wait_for_ppp_down()
   done
 }
 
-set_default_route()
-{
-  if [ -e "${DEFAULT_ROUTE_FILE}" ] ; then
+set_default_route() {
+  if [ -e "${DEFAULT_ROUTE_FILE}" ]; then
     DefaultRoute=$(cat "${DEFAULT_ROUTE_FILE}")
     rm "${DEFAULT_ROUTE_FILE}"
     echo "Setting default route to ${DefaultRoute}"
@@ -100,19 +96,22 @@ set_default_route()
   fi
 }
 
-set_mobile_route()
-{
+set_mobile_route() {
   DefaultRoute=$(ip route show default | cut -d" " -f3-5)
-  echo "Saving current default route (${DefaultRoute})"
-  echo "${DefaultRoute}" > "${DEFAULT_ROUTE_FILE}"
+  if [ "${DefaultRoute##* }" = "ppp0" ]; then
+    echo "Not changing default route as already set to ppp0"
+    [ -e "${DEFAULT_ROUTE_FILE}" ] && rm "${DEFAULT_ROUTE_FILE}"
+  else
+    echo "Saving current default route (${DefaultRoute})"
+    echo "${DefaultRoute}" >"${DEFAULT_ROUTE_FILE}"
 
-  echo "Setting default route to $MobileRoute dev ppp0"
-  sudo ip route del default >/dev/null 2>&1
-  sudo ip route add default via "$MobileRoute" dev ppp0
+    echo "Setting default route to $MobileRoute dev ppp0"
+    sudo ip route del default >/dev/null 2>&1
+    sudo ip route add default via "$MobileRoute" dev ppp0
+  fi
 }
 
-start()
-{
+start() {
   echo "Starting Mobile Data Network"
   wvdial "$DIALER_PROFILE" >/dev/null 2>&1 &
   wait_for_ppp_up
@@ -121,8 +120,7 @@ start()
   exit 0
 }
 
-stop()
-{
+stop() {
   echo "Stopping Mobile Data Network"
   killall wvdial >/dev/null 2>&1
   wait_for_ppp_down

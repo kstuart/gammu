@@ -715,10 +715,11 @@ static GSM_Error SMSDSQL_InitAfterConnect(GSM_SMSDConfig * Config)
 	return ERR_NONE;
 }
 
-GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, SQL_result *result,
-                       MMSMESSAGE mms, SBUFFER buffer)
+GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, MMSMESSAGE mms, SBUFFER buffer)
 {
 	GSM_Error error = ERR_NONE;
+	SQL_result result;
+
 
 	for(size_t i = 0; i < mms->Parts->end; i++) {
 		MMSPART p = &mms->Parts->entries[i];
@@ -738,12 +739,14 @@ GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, SQL_
 		SB_PutAsEncodedBase64(buffer, p->data, p->data_len);
 		SB_PutString(buffer, "', 'base64'));");
 		SB_PutByte(buffer, 0);
-		error = SMSDSQL_Query(Config, SBBase(buffer), result);
+		error = SMSDSQL_Query(Config, SBBase(buffer), &result);
 		if(error != ERR_NONE) {
 			SMSD_Log(DEBUG_ERROR, Config, "Error saving MMS part.");
 			return error;
 		}
 	}
+
+	Config->db->FreeResult(Config, &result);
 
 	return  error;
 }
@@ -775,9 +778,9 @@ GSM_Error SaveMMS(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIn
 		MMSMessage_Destroy(&mms);
 		return error;
 	}
-
-	error = SaveMMSParts(Config, inbox_id, &result, mms, buf);
 	Config->db->FreeResult(Config, &result);
+
+	error = SaveMMSParts(Config, inbox_id, mms, buf);
 
 	SB_Destroy(&buf);
 	MMSMessage_Destroy(&mms);

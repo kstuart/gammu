@@ -10,7 +10,7 @@ typedef struct _MMSContext {
 	SBUFFER MMSBuffer;
 	MMSMESSAGE MappedMMS;
 } MMSContext;
-typedef struct _MMSContext *MMSCTX;
+typedef struct _MMSContext *MMSCONTEXT;
 
 typedef struct _MMSConveyor {
 	GSM_Error (*FetchMMS)(GSM_SMSDConfig*, SBUFFER, GSM_MMSIndicator*);

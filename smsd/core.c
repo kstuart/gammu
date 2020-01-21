@@ -276,18 +276,20 @@ GSM_Error SMSD_Init(GSM_SMSDConfig *Config) {
 	return error;
 }
 
+#define SIZEOF_LOGBUFFER (4096)
+
 PRINTF_STYLE(3, 4)
 void SMSD_Log(SMSD_DebugLevel level, GSM_SMSDConfig *Config, const char *format, ...)
 {
 	GSM_DateTime 	date_time;
-	char 		Buffer[65535];
+	static char  Buffer[SIZEOF_LOGBUFFER];
 	va_list		argp;
 #ifdef HAVE_SYSLOG
 	int priority;
 #endif
 
 	va_start(argp, format);
-	vsprintf(Buffer,format, argp);
+	vsnprintf(Buffer, SIZEOF_LOGBUFFER, format, argp);
 	va_end(argp);
 
 	if (level != DEBUG_ERROR &&
@@ -1383,18 +1385,18 @@ gboolean SMSD_ValidMessage(GSM_SMSDConfig *Config, GSM_MultiSMSMessage *sms)
 
 GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
 {
-	GSM_Error error;
-	SBUFFER Buffer = Config->MMSBuffer;
-
 	assert(Config);
 	assert(MMSIndicator);
+
+	GSM_Error error;
+	SBUFFER Buffer = Config->MMSBuffer;
 	assert(Buffer);
 
 	SB_MinCapacity(Buffer, MMSIndicator->MessageSize);
 
 	error = Config->MMSConveyor->FetchMMS(Config, Buffer, MMSIndicator);
 	if(error != ERR_NONE)
-		SMSD_LogError(DEBUG_ERROR, Config, "Failed to process MMS", error);
+		SMSD_LogError(DEBUG_ERROR, Config, "Failed to get MMS from server", error);
 
 #ifdef DEBUG
 	if(error == ERR_NONE)
@@ -1406,15 +1408,15 @@ GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
 
 GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config)
 {
+	assert(Config);
+
 	GSM_Error error;
 	SBUFFER Buffer = Config->MMSBuffer;
-
-	assert(Config);
   assert(Buffer);
 
 	error = Config->MMSConveyor->SendMMS(Config, Config->MMSBuffer);
 	if(error != ERR_NONE)
-		SMSD_LogError(DEBUG_ERROR, Config, "Failed to process MMS", error);
+		SMSD_LogError(DEBUG_ERROR, Config, "Failed to post MMS to server", error);
 
 	SB_Seek(Buffer, 0, SEEK_SET);
 }

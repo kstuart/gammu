@@ -37,6 +37,20 @@ ssize_t DecodeValueLength(SBUFFER stream)
 }
 
 
+float MMS_DecodeQValue(SBUFFER stream, MMSVALUE out)
+{
+	size_t ui = MMS_DecodeUintVar(stream);
+	if (ui > 1100)
+		ui -= 100;
+	else
+		ui *= 10;
+
+	ui /= 1000.0f;
+	out->allocated = 0;
+	out->type = VT_QVALUE;
+	out->v.float_v = ui;
+	return MMS_ERR_NONE;
+}
 
 MMSError MMS_DecodeShortInteger(SBUFFER stream, MMSVALUE out)
 {
@@ -57,7 +71,7 @@ MMSError MMS_DecodeLongInteger(SBUFFER stream, MMSVALUE out)
 		return MMS_ERR_BADLENGTH;
 
 	SB_NextByte(stream);
-	assert(len <= 4);
+//	assert(len <= 4);
 
 	MMSLongInt n = 0;
 	for(int i = 0; i < len; i++) {
@@ -450,7 +464,7 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSValue *out)
 {
 	switch(fi->vt) {
 		default:
-			printf("unsupported codec (%d)\n", fi->vt);
+			printf("unsupported codec (%d, %s)\n", fi->id, fi->name);
 			return MMS_ERR_NOCODEC;
 		case VT_SHORT_INT:
 			MMS_DecodeShortInteger(stream, out);
@@ -484,6 +498,12 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSValue *out)
 			break;
 		case VT_WK_CHARSET:
 			MMS_DecodeWellKnownCharset(stream, out);
+			break;
+		case VT_CONSTRAINED:
+			MMS_DecodeConstrainedEncoding(stream, out);
+			break;
+		case VT_QVALUE:
+			MMS_DecodeQValue(stream, out);
 			break;
 	}
 

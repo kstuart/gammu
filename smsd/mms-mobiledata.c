@@ -52,12 +52,35 @@ size_t ReadMemoryCallback(void *ptr, size_t size, size_t nitems, void *arg) {
 	return bytes_read < 0 ? 0 : bytes_read;
 }
 
+static int CURL_DebugLogger(CURL *ch, curl_infotype ci,  char *data, size_t size, void *arg)
+{
+	assert(arg);
+	char buffer[4096];
+	GSM_SMSDConfig *Cfg = (GSM_SMSDConfig*)arg;
+
+	if(size > 4095)
+		size = 4095;
+
+	memcpy(buffer, data, size);
+	buffer[size] = '\0';
+
+	switch(ci) {
+		default:
+			return 0;
+		case CURLINFO_HEADER_OUT:
+			SMSD_Log(DEBUG_NOTICE, Cfg, ">>> Header: %s", buffer);
+			break;
+		case CURLINFO_HEADER_IN:
+			SMSD_Log(DEBUG_NOTICE, Cfg, "<<< Header: %s", buffer);
+			break;
+	}
+	return 0;
+}
+
 static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const char *URL)
 {
 	CURL *ch;
 	CURLcode cr;
-
-	SMSD_Log(DEBUG_INFO, Config, "MMS Address: %s", URL);
 
 	ch = curl_easy_init();
 	if(!ch) {
@@ -65,9 +88,15 @@ static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const c
 		return ERR_ABORTED;
 	}
 
+	SMSD_Log(DEBUG_INFO, Config, "Performing HTTP Get with URL %s", URL);
 	curl_easy_setopt(ch, CURLOPT_URL, URL);
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)Buffer);
+	if(Config->debug_level > 0) {
+		curl_easy_setopt(ch, CURLOPT_DEBUGFUNCTION, CURL_DebugLogger);
+		curl_easy_setopt(ch, CURLOPT_DEBUGDATA, Config);
+		curl_easy_setopt(ch, CURLOPT_VERBOSE, 1L);
+	}
 	cr = curl_easy_perform(ch);
 
 	if(cr != CURLE_OK)
@@ -102,6 +131,11 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const ch
 	curl_easy_setopt(ch, CURLOPT_READDATA, (void*)Buffer);
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)RespBuffer);
+	if(Config->debug_level > 0) {
+		curl_easy_setopt(ch, CURLOPT_DEBUGFUNCTION, CURL_DebugLogger);
+		curl_easy_setopt(ch, CURLOPT_DEBUGDATA, Config);
+		curl_easy_setopt(ch, CURLOPT_VERBOSE, 1L);
+	}
 	cr = curl_easy_perform(ch);
 
 	if(cr != CURLE_OK)

@@ -31,6 +31,8 @@ const char *IntToStr(unsigned long i, IntToStringFmt fmt)
 
 // MMSValue
 
+// FIXME: This needs to be refactored to output to a streambuffer
+//        to have the flexibility to render all values.
 CSTR MMSValue_AsString(int field_id, MMSValue *v)
 {
 	char *date;
@@ -53,6 +55,7 @@ CSTR MMSValue_AsString(int field_id, MMSValue *v)
 					date[strlen(date) - 1] = 0;
 					return date;
 			}
+		case VT_CONSTRAINED:
 		case VT_TEXT:
 			return v->v.str;
 		case VT_ENCODED_STRING:
@@ -66,8 +69,8 @@ CSTR MMSValue_AsString(int field_id, MMSValue *v)
 		case VT_PRIORITY:
 		case VT_WK_CHARSET:
 			return v->v.enum_v->name;
-		case VT_CONTENT_TYPE:
-			return "";
+		case VT_QVALUE:
+			return "1.0";
 	}
 }
 
@@ -250,9 +253,9 @@ MMSPART MMS_CreatePart(SBUFFER stream, MMSPARTS parts)
 	header->id.info = MMSFields_FindByID(MMS_CONTENT_TYPE);
 	header->value = v;
 
-	// FIXME: Buggy
-	if(SBPtr(stream) < headers_end)
-		MMS_MapEncodedHeaders(stream, part->headers);
+	// FIXME: Skip part headers until enough parameters/fields are supported for success
+//	if(SBPtr(stream) < headers_end)
+//		MMS_MapEncodedHeaders(stream, part->headers);
 
 	// NOTE: shouldn't be needed if all headers parsed
 	if(SBPtr(stream) != headers_end)

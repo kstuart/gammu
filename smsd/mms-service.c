@@ -7,7 +7,7 @@
 #include "mms-service.h"
 #include "mms-data.h"
 
-MMSHEADER MMS_CreateHeader(SBUFFER stream, MMSHEADERS headers, MMSFieldKind type, MMSFIELDINFO fi)
+MMSHEADER MMS_CreateHeader(SBUFFER stream, MMSHEADERS headers, MMSFieldKind kind, MMSFIELDINFO fi)
 {
 	MMSError error;
 	MMSValue value;
@@ -23,7 +23,7 @@ MMSHEADER MMS_CreateHeader(SBUFFER stream, MMSHEADERS headers, MMSFieldKind type
 		return NULL;
 	}
 
-	header->id.kind = type;
+	header->id.kind = kind;
 	header->id.info = fi;
 	header->value = value;
 
@@ -34,13 +34,13 @@ int MMS_MapEncodedHeaders(SBUFFER stream, MMSHEADERS headers)
 {
 	MMSValue fid;
 	MMSFIELDINFO fi = NULL;
-	MMSFieldKind type = MMS_HEADER;
+	MMSFieldKind kind = MMS_HEADER;
 
 	while(MMS_DecodeShortInteger(stream, &fid) == MMS_ERR_NONE) {
 		fi = MMSFields_FindByID(fid.v.short_int);
 		if(!fi) {
 			fi = WSPFields_FindByID(fid.v.short_int);
-			type = WSP_HEADER;
+			kind = WSP_HEADER;
 		}
 
 		if (!fi) {
@@ -48,7 +48,8 @@ int MMS_MapEncodedHeaders(SBUFFER stream, MMSHEADERS headers)
 			return -1;
 		}
 
-		MMS_CreateHeader(stream, headers, type, fi);
+		MMS_CreateHeader(stream, headers, kind, fi);
+		// stop mapping when we have content-type
 		if(fi->id == MMS_CONTENT_TYPE)
 			return 0;
 	}
@@ -143,16 +144,19 @@ void MMS_ContentTypeAsString(SBUFFER buffer, MMSContentType *ct)
 			break;
 	}
 
+	// FIXME: Avoid parameters that may cause SQL insert to fail until sanitization implemented
 	if(ct->params.count) {
-		MMSPARAMETERS p = &ct->params;
+		MMSPARAMETERS params = &ct->params;
 		SB_PutString(buffer, " ");
-		for(int i = 0; i < ct->params.count; i++)
-			SB_PutFormattedString(buffer, "%s=%s, ",
-			  p->entries[i].kind == MMS_PARAM_TYPED ? p->entries[i].v.typed.type->name
-			  : p->entries[i].v.untyped.token_text,
-			  p->entries[i].kind == MMS_PARAM_TYPED ? MMSValue_AsString(-1, &p->entries[i].v.typed.value)
-			  : p->entries->v.untyped.v.text);
-		SB_Truncate(buffer, 2);
+		for(int i = 0; i < params->count; i++) {
+			MMSPARAMETER p = &params->entries[i];
+			if (p->kind == MMS_PARAM_TYPED)
+				SB_PutFormattedString(buffer, "%s=%s, ", p->v.typed.type->name, MMSValue_AsString(-1, &p->v.typed.value));
+//			SB_PutFormattedString(buffer, "%s=%s, ",
+//			  p->entries[i].kind == MMS_PARAM_TYPED ? p->entries[i].v.typed.type->name
+//			  : p->entries[i].v.untyped.token_text,
+//			  p->entries[i].kind == MMS_PARAM_TYPED ? MMSValue_AsString(-1, &p->entries[i].v.typed.value)
+//			  : p->entries->v.untyped.v.text);
+		}
 	}
-
 }

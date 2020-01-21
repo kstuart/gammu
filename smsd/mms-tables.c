@@ -139,7 +139,7 @@ MMSFIELDINFO MMSFields_FindByID(int id)
 
 // http://openmobilealliance.org/wp/OMNA/wsp/wsp-header-parameters.html
 MMSFieldInfo MMSWellKnownParams[] = {
-	{0x00, "Q",           VT_UNSUPPORTED},
+	{0x00, "Q",           VT_QVALUE},
 	{0x01, "charset",     VT_WK_CHARSET},
 	{0x02, "level",       VT_UNSUPPORTED},
 	{0x03, "type",        VT_UNSUPPORTED},
@@ -148,6 +148,9 @@ MMSFieldInfo MMSWellKnownParams[] = {
 	{0x06, "filename",    VT_UNSUPPORTED},
 	{0x07, "differences", VT_UNSUPPORTED},
 	{0x08, "padding",     VT_UNSUPPORTED},
+	{0x09, "type",        VT_CONSTRAINED},
+	{0x0a, "start",       VT_TEXT},
+	{0x0b, "start-info",  VT_TEXT},
 };
 
 MMSFIELDINFO MMS_WellKnownParams_FindByID(int id)
@@ -161,7 +164,6 @@ MMSFIELDINFO MMS_WellKnownParams_FindByID(int id)
 
 	return fi->id == id ? fi : NULL;
 }
-
 
 // https://www.iana.org/assignments/character-sets/character-sets.xhtml
 MMSValueEnum MMSCharsetEnum[] = {

@@ -67,6 +67,8 @@ typedef enum _MMSValueType {
 	VT_COMPACT,
 	VT_WK_CHARSET,
 	VT_WK_MEDIA,
+	VT_CONSTRAINED,
+	VT_QVALUE,
 	VT_UNSUPPORTED
 } MMSValueType;
 
@@ -210,6 +212,7 @@ typedef struct _MMSValue {
 		EncodedString encoded_string;
 		MMSVALUEENUM enum_v;
 		MMSContentType content_type;
+		float float_v;
 	} v;
 } MMSValue;
 typedef MMSValue *MMSVALUE;
