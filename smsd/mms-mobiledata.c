@@ -12,8 +12,9 @@ GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
 {
 	assert(Config != NULL);
 	if(Config->RunOnDataConnect == NULL) {
-		SMSD_Log(DEBUG_INFO, Config, "No script provided to register APN.");
-		return ERR_ABORTED;
+		SMSD_Log(DEBUG_INFO, Config, "No RunOnDataConnect script provided to register APN.");
+		SMSD_Log(DEBUG_INFO, Config, "Assuming the connection is already established.");
+		return ERR_NONE;
 	}
 
 	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "start", "data connect");
@@ -26,7 +27,13 @@ GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
 
 GSM_Error MobileDataStop(GSM_SMSDConfig *Config)
 {
-	assert(Config && Config->RunOnDataConnect != NULL);
+	assert(Config);
+
+	if(Config->RunOnDataConnect == NULL) {
+		SMSD_Log(DEBUG_INFO, Config, "No RunOnDataConnect script provided to unregister APN.");
+		SMSD_Log(DEBUG_INFO, Config, "Assuming the connection is managed externally.");
+		return ERR_NONE;
+	}
 
 	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "stop", "data disconnect");
 	if(success == FALSE) {
