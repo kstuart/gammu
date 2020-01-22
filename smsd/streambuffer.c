@@ -175,7 +175,7 @@ ssize_t SB_Seek(SBUFFER buffer, long offset, int origin)
 			return -1;
 	}
 
-	if(new_pos > buffer->end) {
+	if(new_pos > buffer->end + 1) {
 		buffer->error = SB_ERR_BADSEEKOFFSET;
 		return -1;
 	}
