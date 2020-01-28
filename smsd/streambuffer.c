@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <gammu-smsd.h>
 #include <gammu-unicode.h>
+#include <stdint.h>
 
 #include "streambuffer.h"
 #include "../libgammu/misc/coding/coding.h"
@@ -358,6 +359,21 @@ int SB_PutAsEncodedBase64(SBUFFER buffer, void *data, size_t nbytes)
 		return -1;
 
 	buffer->end += size;
+
+	return 0;
+}
+
+int SB_PutAsBinHex(SBUFFER buffer, void *data, size_t nbytes)
+{
+	assert(buffer);
+	assert(data);
+	static const unsigned char hex[] = "0123456789ABCDEF";
+
+	for(size_t i = 0; i < nbytes; i++) {
+		uint8_t *byte = (uint8_t*)data + i;
+		SB_PutByte(buffer, hex[*byte >> 4 & 0x0Fu]);
+		SB_PutByte(buffer, hex[*byte & 0x0Fu]);
+	}
 
 	return 0;
 }

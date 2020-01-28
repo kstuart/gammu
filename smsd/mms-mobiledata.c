@@ -135,6 +135,10 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const ch
 		return ERR_ABORTED;
 	}
 
+	struct curl_slist *list = NULL;
+	list = curl_slist_append(list, "Content-Type: application/vnd.wap.mms-message");
+	curl_easy_setopt(ch, CURLOPT_HTTPHEADER, list);
+
 	curl_easy_setopt(ch, CURLOPT_URL, URL);
 	curl_easy_setopt(ch, CURLOPT_POST, 1L);
 	curl_easy_setopt(ch, CURLOPT_READFUNCTION, ReadMemoryCallback);

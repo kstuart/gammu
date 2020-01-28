@@ -457,6 +457,7 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 
 	Config->MMSConveyor = &MMSMobileDataConveyor;
 	Config->MMSBuffer = SB_InitWithCapacity(MMS_INIT_BUFFER_SIZE);
+	Config->MMSOutboxID = -1;
 
 	return Config;
 }
@@ -1408,19 +1409,21 @@ GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
 	return error;
 }
 
-GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config)
+GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config, SBUFFER MMSBuffer)
 {
 	assert(Config);
-
+	assert(MMSBuffer);
+	long outbox_id = Config->MMSOutboxID;
 	GSM_Error error;
-	SBUFFER Buffer = Config->MMSBuffer;
-  assert(Buffer);
 
-	error = Config->MMSConveyor->SendMMS(Config, Config->MMSBuffer);
+	if(outbox_id < 1) {
+		SMSD_Log(DEBUG_ERROR, Config, "Requested to send MMS with invalid outbox id(%ld)", outbox_id);
+		return ERR_ABORTED;
+	}
+
+	error = Config->MMSConveyor->SendMMS(Config, MMSBuffer);
 	if(error != ERR_NONE)
 		SMSD_LogError(DEBUG_ERROR, Config, "Failed to post MMS to server", error);
-
-	SB_Seek(Buffer, 0, SEEK_SET);
 }
 
 /**
@@ -1741,6 +1744,18 @@ GSM_Error SMSD_SendSMS(GSM_SMSDConfig *Config)
 	}
 
 	error = Config->Service->FindOutboxSMS(&sms, Config, Config->SMSID);
+	if(error == MMS_MESSAGE_TO_SEND) {
+		assert(sms.Number == 1);
+		error = SMSD_SendMMS(Config, Config->MMSBuffer);
+		if(error != ERR_NONE) {
+			SMSD_Log(DEBUG_INFO, Config, "Error sending MMS (%s)", Config->SMSID);
+			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_ERROR, -1);
+		}
+		Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_OK, -1);
+		Config->Service->MoveSMS(&sms,Config, Config->SMSID, TRUE,FALSE);
+
+		return error;
+	}
 
 	if (error == ERR_EMPTY || error == ERR_NOTSUPPORTED) {
 		/* No outbox sms */

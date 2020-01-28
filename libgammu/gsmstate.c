@@ -1688,6 +1688,10 @@ GSM_Error GSM_ReadConfig(INI_Section *cfg_info, GSM_Config *cfg, int num)
       goto fail;
   }
 
+	Temp = INI_GetValue(cfg_info, section, "phonenumber", FALSE);
+	if(Temp)
+		strcpy(cfg->PhoneNumber, Temp);
+
   return ERR_NONE;
 
 fail:

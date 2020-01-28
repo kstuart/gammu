@@ -27,7 +27,7 @@ MMSError MMS_DecodeUntypedParameter(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeParameters(SBUFFER stream, CPTR end, MMSVALUE out);
 MMSError MMS_DecodeMediaType(SBUFFER stream, CPTR end, MMSVALUE out);
 MMSError MMS_DecodeContentGeneralForm(SBUFFER stream, MMSVALUE out);
-MMSError MMS_ContentTypeDecode(SBUFFER stream, MMSVALUE out);
+MMSError MMS_DecodeContentType(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeYesNo(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodePriority(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeMessageClass(SBUFFER stream, MMSVALUE out);

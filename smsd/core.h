@@ -24,6 +24,7 @@
 #include "../libgammu/misc/array.h"
 #include "mms-service.h"
 
+#define MMS_MESSAGE_TO_SEND (ERR_LAST_VALUE + 1)
 typedef struct _StreamBuffer *SBUFFER;
 
 typedef enum {
@@ -222,6 +223,7 @@ struct _GSM_SMSDConfig {
 	GSM_SMSDService		*Service;
 	MMSConveyor *MMSConveyor;
 	SBUFFER MMSBuffer;
+	long MMSOutboxID;
 };
 
 extern GSM_Error SMSD_NoneFunction		(void);

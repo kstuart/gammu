@@ -3,6 +3,14 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+/* Interpretation of First Octet
+ * 0 - 30     This octet is followed by the indicated number (0 –30) of data octets
+ * 31         This octet is followed by a uintvar, which indicates the number of data octets after it
+ * 32 - 127   The value is a text string, terminated by a zero octet (NUL character)
+ * 128 - 255  It is an encoded 7-bit value; this header has no more data
+ ********/
 
 #define MMS_MAX_PARAMS 10
 
@@ -17,6 +25,26 @@ typedef const char *CSTR;
 
 typedef uint8_t MMSShortInt;
 typedef uint32_t MMSLongInt;
+typedef uint32_t MMSUint;
+typedef float MMSQValue;
+
+typedef int64_t LocalTXID;
+
+typedef enum _MMS_Version {
+	MMS_VERSION_10 = 0x10,
+	MMS_VERSION_12 = 0x12,
+	MMS_VERSION_1X = 0x1F,
+} MMS_Version;
+
+typedef enum _MMSMessageTypeID {
+	M_SEND_REQ = 128,
+	M_SEND_CONF = 129,
+	M_NOTIFICATION_IND = 130,
+	M_NOTIFYRESP_IND = 131,
+	M_RETRIEVE_CONF = 132,
+	M_ACKNOWLEDGE_IND = 133,
+	M_DELIVERY_IND = 134,
+} MMSMessageTypeID;
 
 typedef enum _MMSError {
 	MMS_ERR_NONE,
@@ -29,17 +57,29 @@ typedef enum _MMSError {
 	MMS_ERR_LOOKUP_FAILED,
 	MMS_ERR_MEMORY,
 	MMS_ERR_UNSUPPORTED,
+	MMS_ERR_READ,
+	MMS_ERR_REQUIRED_FIELD,
+	MMS_ERR_ENC_NO_ENCODER,
+	MMS_ERR_UNKNOWN_MIME,
+	MMS_ERR_NOTFOUND,
 	MMS_ERR_UNIMPLEMENTED,
 } MMSError;
+//{"ASCII",           3},
+//{"UTF-8",           106},
+//{"*",               128},
 
 enum {
 	NO_VALUE = 0,
 	END_OF_STRING = 0,
 	Q_TOKEN = 128,
+	TEXT_QUOTE = 127,
+	LENGTH_QUOTE = 31,
 	TOK_ADDRESS_PRESENT = 128,
 	TOK_ADDRESS_INSERT = 129,
-	ANY_CHARSET = 128,
-	TEXT_QUOTE = 127,
+	CHARSET_ANY = 128,
+	CHARSET_ASCII = 3,
+	CHARSET_UTF8 = 106,
+	CHARSET_DEFAULT = CHARSET_UTF8,
 };
 
 typedef enum _MMSFieldKind {
@@ -49,8 +89,10 @@ typedef enum _MMSFieldKind {
 
 typedef enum _MMSValueType {
 	VT_NONE,
-	VT_LONG_INT,
 	VT_SHORT_INT,
+	VT_VERSION,
+	VT_LONG_INT,
+	VT_LOCAL_TXID,
 	VT_TEXT,
 	VT_ENCODED_STRING,
 	VT_CONTENT_TYPE,
@@ -61,7 +103,9 @@ typedef enum _MMSValueType {
 	VT_RESPONSE_STATUS,
 	VT_STATUS,
 	VT_DTIME,
+	VT_DATE,
 	VT_FROM,
+	VT_ADDRESS,
 	VT_YESNO,
 	VT_HIDESHOW,
 	VT_COMPACT,
@@ -72,91 +116,6 @@ typedef enum _MMSValueType {
 	VT_UNSUPPORTED
 } MMSValueType;
 
-enum WSPFieldID {
-	WSP_ACCEPT = 0x00,
-	WSP_ACCEPT_CHARSET = 0x01,
-	WSP_ACCEPT_ENCODING = 0x02,
-	WSP_ACCEPT_LANGUAGE = 0x03,
-	WSP_ACCEPT_RANGES = 0x04,
-	WSP_AGE = 0x05,
-	WSP_ALLOW = 0x06,
-	WSP_AUTHORIZATION = 0x07,
-	WSP_CACHE_CONTROL = 0x08,
-	WSP_CONNECTION = 0x09,
-	WSP_CONTENT_BASE = 0x0A,
-	WSP_CONTENT_ENCODING = 0x0B,
-	WSP_CONTENT_LANGUAGE = 0x0C,
-	WSP_CONTENT_LENGTH = 0x0D,
-	WSP_CONTENT_LOCATION = 0x0E,
-	WSP_CONTENT_MD5 = 0x0F,
-	WSP_CONTENT_RANGE = 0x10,
-	WSP_CONTENT_TYPE = 0x11,
-	WSP_DATE = 0x12,
-	WSP_ETAG = 0x13,
-	WSP_EXPIRES = 0x14,
-	WSP_FROM = 0x15,
-	WSP_HOST = 0x16,
-	WSP_IF_MODIFIED_SINCE = 0x17,
-	WSP_IF_MATCH = 0x18,
-	WSP_IF_NONE_MATCH = 0x19,
-	WSP_IF_RANGE = 0x1A,
-	WSP_IF_UNMODIFIED_SINCE = 0x1B,
-	WSP_LOCATION = 0x1C,
-	WSP_LAST_MODIFIED = 0x1D,
-	WSP_MAX_FORWARDS = 0x1E,
-	WSP_PRAGMA = 0x1F,
-	WSP_PROXY_AUTHENTICATE = 0x20,
-	WSP_PROXY_AUTHORIZATION = 0x21,
-	WSP_PUBLIC = 0x22,
-	WSP_RANGE = 0x23,
-	WSP_REFERER = 0x24,
-	WSP_RETRY_AFTER = 0x25,
-	WSP_SERVER = 0x26,
-	WSP_TRANSFER_ENCODING = 0x27,
-	WSP_UPGRADE = 0x28,
-	WSP_USER_AGENT = 0x29,
-	WSP_VARY = 0x2A,
-	WSP_VIA = 0x2B,
-	WSP_WARNING = 0x2C,
-	WSP_WWW_AUTHENTICATE = 0x2D,
-	WSP_CONTENT_DISPOSITION = 0x2E,
-	WSP_X_WAP_APPLICATION_ID = 0x2F,
-	WSP_X_WAP_CONTENT_URI = 0x30,
-	WSP_X_WAP_INITIATOR_URI = 0x31,
-	WSP_ACCEPT_APPLICATION = 0x32,
-	WSP_BEARER_INDICATION = 0x33,
-	WSP_PUSH_FLAG = 0x34,
-	WSP_PROFILE = 0x35,
-	WSP_PROFILE_DIFF = 0x36,
-	WSP_PROFILE_WARNING = 0x37,
-};
-
-enum MMSFieldID {
-	MMS_BCC = 0x01,
-	MMS_CC = 0x02,
-	MMS_CONTENT_LOCATION = 0x03,
-	MMS_CONTENT_TYPE = 0x04,
-	MMS_DATE = 0x05,
-	MMS_DELIVERY_REPORT = 0x06,
-	MMS_DELIVERY_TIME = 0x07,
-	MMS_EXPIRY = 0x08,
-	MMS_FROM = 0x09,
-	MMS_MESSAGE_CLASS = 0x0A,
-	MMS_MESSAGE_ID = 0x0B,
-	MMS_MESSAGE_TYPE = 0x0C,
-	MMS_MMS_VERSION = 0x0D,
-	MMS_MESSAGE_SIZE = 0x0E,
-	MMS_PRIORITY = 0x0F,
-	MMS_READ_REPLY = 0x10,
-	MMS_REPORT_ALLOWED = 0x11,
-	MMS_RESPONSE_STATUS = 0x12,
-	MMS_RESPONSE_TEXT = 0x13,
-	MMS_SENDER_VISIBILITY = 0x14,
-	MMS_STATUS = 0x15,
-	MMS_SUBJECT = 0x16,
-	MMS_TO = 0x17,
-	MMS_TRANSACTION_ID = 0x18
-};
 
 typedef struct _MMSValueEnum {
 	const char *name;
@@ -164,6 +123,7 @@ typedef struct _MMSValueEnum {
 } MMSValueEnum;
 
 typedef MMSValueEnum *MMSVALUEENUM;
+typedef MMSVALUEENUM MMSCHARSET;
 
 typedef struct _Charset {
 	const char *Name;
@@ -174,11 +134,12 @@ typedef Charset *CHARSET;
 
 typedef struct _EncodedString {
 	MMSVALUEENUM charset;
-	PBYTE string;
+	STR text;
 } EncodedString;
+typedef EncodedString *ENCODEDSTRING;
 
 typedef struct _MMSFieldInfo {
-	const int id;
+	const int code;
 	const char *name;
 	MMSValueType vt;
 } MMSFieldInfo;
@@ -200,10 +161,11 @@ typedef struct _MMSContentType {
 	} v;
 	MMSParameters params;
 } MMSContentType;
+typedef MMSContentType *MMSCONTENTTYPE;
 
 typedef struct _MMSValue {
 	MMSValueType type;
-	int allocated;
+	bool allocated;
 	union {
 		PBYTE ptr;
 		MMSShortInt short_int;
@@ -212,6 +174,7 @@ typedef struct _MMSValue {
 		EncodedString encoded_string;
 		MMSVALUEENUM enum_v;
 		MMSContentType content_type;
+		LocalTXID local_txid;
 		float float_v;
 	} v;
 } MMSValue;
@@ -221,6 +184,7 @@ typedef struct _TypedParam {
 	MMSFIELDINFO type;
 	MMSValue value;
 } TypedParam;
+typedef TypedParam *TYPEDPARAM;
 
 typedef struct _UntypedParam {
 	MMSValueType value_type;
@@ -230,6 +194,7 @@ typedef struct _UntypedParam {
 		STR text;
 	} v;
 } UntypedParam;
+typedef UntypedParam *UNTYPEDPARAM;
 
 typedef enum _MMSParameterKind {
 	MMS_PARAM_TYPED,
@@ -265,6 +230,7 @@ typedef MMSHeaders *MMSHEADERS;
 // WSP 8.5 Application/vnd.wap.multipart
 typedef struct _MMSPart {
 	MMSHEADERS headers;
+	bool allocated;
 	size_t data_len;
 	PBYTE data;
 } MMSPart;
@@ -279,21 +245,41 @@ typedef MMSParts *MMSPARTS;
 
 typedef struct _MMSMessage {
 	MMSVALUEENUM MessageType;
+	STR id;
+	MMSVALUE Version;
 	MMSHEADERS Headers;
 	MMSPARTS Parts;
 } MMSMessage;
 typedef MMSMessage *MMSMESSAGE;
 
-CSTR MMSValue_AsString(int field_id, MMSValue *v);
+bool IsEmptyString(CSTR str);
+size_t GetTextLength(MMSCHARSET charset, CSTR text);
+int MMSEncodedText_Length(ENCODEDSTRING s);
+LocalTXID CreateTransactionID(void);
+
+void MMSValue_Init(MMSVALUE v);
+void MMSValue_Clear(MMSVALUE value);
+MMSError MMSValue_AsString(SBUFFER stream, MMSVALUE v);
 MMSError MMSValue_SetEnum(MMSVALUE out, MMSValueType vt, MMSVALUEENUM entry);
+MMSError MMSValue_SetShort(MMSVALUE out, MMSShortInt value);
+MMSError MMSValue_SetLocalTransactionID(MMSVALUE out, LocalTXID value);
+MMSError MMSValue_CopyEncodedStr(MMSVALUE v, MMSValueType t, ENCODEDSTRING str);
+MMSError MMSValue_CopyStr(MMSVALUE v, MMSValueType t, CSTR str);
+MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE value);
 
 void MMSHeader_Clear(MMSHEADER header);
+void MMSHeader_ShallowClone(MMSHEADER dest, MMSHEADER src);
+MMSHEADER MMSHeader_FindByID(MMSHEADERS headers, MMSFieldKind type, int fieldId);
+bool MMSHeader_SameHeader(MMSHEADER l, MMSHEADER r);
+MMSError MMSHeader_AsString(SBUFFER stream, MMSHEADER header);
 
 MMSHEADERS MMSHeaders_InitWithCapacity(int num_headers);
 void MMSHeaders_Destroy(MMSHEADERS *headers);
 MMSHEADER MMSHeaders_NewHeader(MMSHEADERS headers);
 int MMSHeaders_GrowNumEntries(MMSHEADERS headers, int delta);
-MMSHEADER MMSHeader_FindByID(MMSHEADERS headers, MMSFieldKind type, int fieldId);
+MMSHEADER MMSHeaders_FindByID(MMSHEADERS h, MMSFieldKind kind, int field_id);
+MMSError MMSHeaders_Remove(MMSHEADERS headers, MMSHEADER header);
+
 
 int MMSParts_GrowNumEntries(MMSPARTS parts, int delta);
 MMSPARTS MMSParts_InitWithCapacity(int num_parts);
@@ -305,5 +291,19 @@ void MMSPart_Destroy(MMSPART *part);
 
 MMSMESSAGE MMSMessage_Init(void);
 void MMSMessage_Destroy(MMSMESSAGE *message);
+MMSError MMSMessage_SetID(MMSMESSAGE message, CSTR id);
+MMSHEADER MMSMessage_FindHeader(MMSMESSAGE m, MMSFieldKind kind, int id);
+MMSHEADER MMSMessage_FindOrNewHeader(MMSMESSAGE m, MMSFieldKind kind, int id);
+MMSError MMSMessage_AddPart(MMSMESSAGE m, CSTR media, CPTR data, size_t data_len);
+
+MMSError MMSMessage_SetMessageType(MMSMESSAGE m,  MMSMessageTypeID type);
+MMSError MMSMessage_SetMessageVersion(MMSMESSAGE m, MMS_Version v);
+MMSError MMSMessage_SetTransactionID(MMSMESSAGE m, LocalTXID txid);
+MMSError MMSMessage_SetDeliveryReport(MMSMESSAGE m, MMSVALUEENUM v);
+
+MMSError MMSMessage_CopyAddressFrom(MMSMESSAGE m, ENCODEDSTRING from);
+MMSError MMSMessage_CopyAddressTo(MMSMESSAGE m, ENCODEDSTRING to);
+
+MMSFIELDINFO MMSFieldInfo_FindByID(MMSFieldKind kind, int id);
 
 #endif //GAMMU_MMS_DATA_H

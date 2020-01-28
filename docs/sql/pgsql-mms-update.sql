@@ -13,8 +13,8 @@ drop table if exists outbox_mms_parts;
 create table outbox_mms_parts
 (
     "ID" serial not null primary key,
-    "OUTBOX_ID" integer references outbox("ID"),
-    "SENT_ID" integer default null,
+    "OUTBOX_ID" integer,
     "MediaType" varchar(255),
+    "DataLength" integer not null,
     "Data" bytea
 );

@@ -1,7 +1,25 @@
 #include <string.h>
-#include "streambuffer.h"
 #include <assert.h>
 #include "mms-data.h"
+#include "mms-tables.h"
+
+static MMSFIELDINFO _FieldInfoLookupByName(MMSFIELDINFO tbl, int count, const char *name)
+{
+	for(int i = 0; i < count; i++)
+		if(strcasecmp(tbl[i].name, name) == 0)
+			return &tbl[i];
+
+	return NULL;
+}
+
+static MMSVALUEENUM _EnumLookupByName(MMSVALUEENUM tbl, int count, const char *name)
+{
+	for(int i = 0; i < count; i++)
+		if(strncasecmp(tbl[i].name, name, strlen(tbl[i].name)) == 0)
+			return &tbl[i];
+
+	return NULL;
+}
 
 static MMSVALUEENUM _EnumLookupByID(MMSVALUEENUM tbl, int count, MMSShortInt value)
 {
@@ -17,7 +35,7 @@ static MMSVALUEENUM _EncodedEnumQuickLookup(MMSVALUEENUM tbl, int count, MMSShor
 	assert(value & 0x80u);
 
 	MMSShortInt idx = value & 0x7fu;
-	if(idx > count || idx < 0)
+	if(idx > count)
 		return NULL;
 
 	MMSVALUEENUM entry = &tbl[idx];
@@ -85,38 +103,44 @@ MMSFieldInfo WSPFields[] = {
 	{WSP_PROFILE_DIFF,         "Profile-Diff",         VT_UNSUPPORTED},
 	{WSP_PROFILE_WARNING,      "Profile-Warning",      VT_UNSUPPORTED},
 };
+static const size_t WSPFieldsSize = sizeof(WSPFields) / sizeof(WSPFields[0]);
+
+MMSFIELDINFO WSPFields_FindByName(const char *name)
+{
+	assert(name);
+	return _FieldInfoLookupByName(WSPFields, WSPFieldsSize, name);
+}
 
 MMSFIELDINFO WSPFields_FindByID(int id)
 {
-	static const size_t limit = sizeof(WSPFields) / sizeof(WSPFields[0]);
 	MMSFIELDINFO fi;
-	if ((unsigned) id > limit)
+	if ((unsigned) id > WSPFieldsSize)
 		return NULL;
 
 	fi = &WSPFields[id];
 
-	return fi->id == id ? fi : NULL;
+	return fi->code == id ? fi : NULL;
 }
 
 MMSFieldInfo MMSFields[] = {
-	{MMS_BCC,               "Bcc",                     VT_ENCODED_STRING},
-	{MMS_CC,                "Cc",                      VT_ENCODED_STRING},
-	{MMS_CONTENT_LOCATION,  "X-Mms-Content-Location",  VT_TEXT},
-	{MMS_CONTENT_TYPE,      "Content-Type",            VT_CONTENT_TYPE},
-	{MMS_DATE,              "Date",                    VT_LONG_INT},
-	{MMS_DELIVERY_REPORT,   "X-Mms-Delivery-Report",   VT_YESNO},
-	{MMS_DELIVERY_TIME,     "X-Mms-Delivery-Time",     VT_DTIME},
-	{MMS_EXPIRY,            "X-Mms-Expiry",            VT_DTIME},
-	{MMS_FROM,              "From",                    VT_FROM},
-	{MMS_MESSAGE_CLASS,     "X-Mms-Message-Class",     VT_MESSAGE_CLASS},
-	{MMS_MESSAGE_ID,        "Message-ID",              VT_TEXT},
-	{MMS_MESSAGE_TYPE,      "X-Mms-Message-Type",      VT_MESSAGE_TYPE},
-	{MMS_MMS_VERSION,       "X-Mms-MMS-Version",       VT_SHORT_INT},
-	{MMS_MESSAGE_SIZE,      "X-Mms-Message-Size",      VT_LONG_INT},
-	{MMS_PRIORITY,          "X-Mms-Priority",          VT_PRIORITY},
-	{MMS_READ_REPLY,        "X-Mms-Read-Reply",        VT_YESNO},
-	{MMS_REPORT_ALLOWED,    "X-Mms-Report-Allowed",    VT_YESNO},
-	{MMS_RESPONSE_STATUS,   "X-Mms-Response-Status",   VT_RESPONSE_STATUS},
+	{MMS_BCC,               "Bcc",                    VT_ENCODED_STRING},
+	{MMS_CC,                "Cc",                     VT_ENCODED_STRING},
+	{MMS_CONTENT_LOCATION,  "X-Mms-Content-Location", VT_TEXT},
+	{MMS_CONTENT_TYPE,      "Content-Type",           VT_CONTENT_TYPE},
+	{MMS_DATE,              "Date",                   VT_LONG_INT},
+	{MMS_DELIVERY_REPORT,   "X-Mms-Delivery-Report",  VT_YESNO},
+	{MMS_DELIVERY_TIME,     "X-Mms-Delivery-Time",    VT_DTIME},
+	{MMS_EXPIRY,            "X-Mms-Expiry",           VT_DTIME},
+	{MMS_FROM,              "From",                   VT_FROM},
+	{MMS_MESSAGE_CLASS,     "X-Mms-Message-Class",    VT_MESSAGE_CLASS},
+	{MMS_MESSAGE_ID,        "Message-ID",             VT_TEXT},
+	{MMS_MESSAGE_TYPE,      "X-Mms-Message-Type",     VT_MESSAGE_TYPE},
+	{MMS_MMS_VERSION,       "X-Mms-MMS-Version",      VT_SHORT_INT},
+	{MMS_MESSAGE_SIZE,      "X-Mms-Message-Size",     VT_LONG_INT},
+	{MMS_PRIORITY,          "X-Mms-Priority",         VT_PRIORITY},
+	{MMS_READ_REPLY,        "X-Mms-Read-Reply",       VT_YESNO},
+	{MMS_REPORT_ALLOWED,    "X-Mms-Report-Allowed",   VT_YESNO},
+	{MMS_RESPONSE_STATUS,   "X-Mms-Response-Status",  VT_RESPONSE_STATUS},
 	{MMS_RESPONSE_TEXT,     "X-Mms-Response-Text",     VT_ENCODED_STRING},
 	{MMS_SENDER_VISIBILITY, "X-Mms-Sender-Visibility", VT_HIDESHOW},
 	{MMS_STATUS,            "X-Mms-Status",            VT_STATUS},
@@ -124,17 +148,23 @@ MMSFieldInfo MMSFields[] = {
 	{MMS_TO,                "To",                      VT_ENCODED_STRING},
 	{MMS_TRANSACTION_ID,    "X-Mms-Transaction-Id",    VT_TEXT},
 };
+static const size_t MMSFieldsSize = sizeof(MMSFields) / sizeof(MMSFields[0]);
+
+MMSFIELDINFO MMSFields_FindByName(const char *name)
+{
+	assert(name);
+	return _FieldInfoLookupByName(MMSFields, MMSFieldsSize, name);
+}
 
 MMSFIELDINFO MMSFields_FindByID(int id)
 {
-	static const size_t limit = sizeof(MMSFields) / sizeof(MMSFields[0]);
 	MMSFIELDINFO fi;
-	if ((unsigned) id > limit)
+	if ((unsigned) id > MMSFieldsSize)
 		return NULL;
 
 	fi = &MMSFields[id - 1];
 
-	return fi->id == id ? fi : NULL;
+	return fi->code == id ? fi : NULL;
 }
 
 // http://openmobilealliance.org/wp/OMNA/wsp/wsp-header-parameters.html
@@ -152,8 +182,15 @@ MMSFieldInfo MMSWellKnownParams[] = {
 	{0x0a, "start",       VT_TEXT},
 	{0x0b, "start-info",  VT_TEXT},
 };
+static const size_t MMSWellKnownParamsSize = sizeof(MMSWellKnownParams) / sizeof(MMSWellKnownParams[0]);
 
-MMSFIELDINFO MMS_WellKnownParams_FindByID(int id)
+MMSFIELDINFO MMS_WkParam_FindByName(const char *name)
+{
+	assert(name);
+	return _FieldInfoLookupByName(MMSWellKnownParams, MMSWellKnownParamsSize, name);
+}
+
+MMSFIELDINFO MMS_WkParams_FindByID(int id)
 {
 	static const size_t limit = sizeof(MMSWellKnownParams) / sizeof(MMSWellKnownParams[0]);
 	MMSFIELDINFO fi;
@@ -162,14 +199,14 @@ MMSFIELDINFO MMS_WellKnownParams_FindByID(int id)
 
 	fi = &MMSWellKnownParams[id];
 
-	return fi->id == id ? fi : NULL;
+	return fi->code == id ? fi : NULL;
 }
 
 // https://www.iana.org/assignments/character-sets/character-sets.xhtml
 MMSValueEnum MMSCharsetEnum[] = {
-	{"US-ASCII",        3},
+	{"ASCII",           3},
 	{"UTF-8",           106},
-	{"*",               127},
+	{"*",               128},
 	{"big5",            0x07EA},
 	{"iso-10646-ucs-2", 0x03E8},
 	{"iso-8859-1",      0x04},
@@ -185,7 +222,13 @@ MMSValueEnum MMSCharsetEnum[] = {
 };
 size_t MMSCharsetEnumSize = sizeof(MMSCharsetEnum) / sizeof(MMSCharsetEnum[0]);
 
-MMSVALUEENUM MMS_Charset_FindByID(int id)
+MMSVALUEENUM MMS_Charset_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(MMSCharsetEnum, MMSCharsetEnumSize, name);
+}
+
+MMSVALUEENUM MMS_Charset_FindByID(MMSLongInt id)
 {
 	return _EnumLookupByID(MMSCharsetEnum, MMSCharsetEnumSize, id);
 }
@@ -274,23 +317,35 @@ MMSValueEnum WKContentTypes[] = {
 };
 size_t WkContentTypesSize = sizeof(WKContentTypes) / sizeof(WKContentTypes[0]);
 
+MMSVALUEENUM MMS_WkContentType_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(WKContentTypes, WkContentTypesSize, name);
+}
+
 MMSVALUEENUM MMS_WkContentType_FindByID(int id)
 {
 	return _EnumLookupByID(WKContentTypes, WkContentTypesSize, id);
 }
 
 MMSValueEnum MMSMessageTypeEnum[] = {
-	{"m-send-req", 128},
-	{"m-send-conf", 129},
-	{"m-notification-ind", 130},
-	{"m-notifyresp-ind", 131},
-	{"m-retrieve-conf", 132},
-	{"m-acknowledge-ind", 133},
-	{"m-delivery-ind", 134},
+	{"m-send-req", M_SEND_REQ},
+	{"m-send-conf", M_SEND_CONF},
+	{"m-notification-ind", M_NOTIFICATION_IND},
+	{"m-notifyresp-ind", M_NOTIFYRESP_IND},
+	{"m-retrieve-conf", M_RETRIEVE_CONF},
+	{"m-acknowledge-ind", M_ACKNOWLEDGE_IND},
+	{"m-delivery-ind", M_DELIVERY_IND},
 };
 size_t MMSMessageTypeEnumSize = sizeof(MMSMessageTypeEnum) / sizeof(MMSMessageTypeEnum[0]);
 
-MMSVALUEENUM MMS_MessageType_FindByID(int id)
+MMSVALUEENUM MMS_MessageType_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(MMSMessageTypeEnum, MMSMessageTypeEnumSize, name);
+}
+
+MMSVALUEENUM MMS_MessageType_FindByID(MMSMessageTypeID id)
 {
 	return _EncodedEnumQuickLookup(MMSMessageTypeEnum, MMSMessageTypeEnumSize, id);
 }
@@ -302,6 +357,12 @@ MMSValueEnum MMSMessageClassEnum[] = {
 	{"Auto", 131},
 };
 size_t MMSMessageClassEnumSize = sizeof(MMSMessageClassEnum) / sizeof(MMSMessageClassEnum[0]);
+
+MMSVALUEENUM MMS_MessageClass_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(MMSMessageClassEnum, MMSMessageClassEnumSize, name);
+}
 
 MMSVALUEENUM MMS_MessageClass_FindByID(int id)
 {
@@ -315,6 +376,12 @@ MMSValueEnum MMSPriorityEnum[] = {
 };
 size_t MMSPriorityEnumSize = sizeof(MMSPriorityEnum) / sizeof(MMSPriorityEnum[0]);
 
+MMSVALUEENUM MMS_Priority_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(MMSPriorityEnum, MMSPriorityEnumSize, name);
+}
+
 MMSVALUEENUM MMS_Priority_FindByID(int id)
 {
 	return _EncodedEnumQuickLookup(MMSPriorityEnum, MMSPriorityEnumSize, id);
@@ -325,6 +392,12 @@ MMSValueEnum MMSYesNoEnum[] = {
 	{ "No", 129 },
 };
 size_t MMSYesNoEnumSize = sizeof(MMSYesNoEnum) / sizeof(MMSYesNoEnum[0]);
+
+MMSVALUEENUM MMS_YesNo_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(MMSYesNoEnum, MMSYesNoEnumSize, name);
+}
 
 MMSVALUEENUM MMS_YesNo_FindByID(int id)
 {

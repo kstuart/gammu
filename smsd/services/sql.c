@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <time.h>
 #include <assert.h>
+#include <fcntl.h>
+
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -33,7 +35,8 @@
 
 #include "../streambuffer.h"
 #include "../mms-service.h"
-#include "../mms-data.h"
+
+#include "../../libgammu/gsmstate.h"
 
 GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator);
 
@@ -983,8 +986,6 @@ static GSM_Error SMSDSQL_RefreshSendStatus(GSM_SMSDConfig * Config, char *ID)
 	return ERR_NONE;
 }
 
-
-
 static GSM_Error SMSDSQL_UpdateRetries(GSM_SMSDConfig * Config, char *ID)
 {
 	SQL_result res;
@@ -1028,10 +1029,72 @@ static GSM_Error SMSDSQL_UpdateRetries(GSM_SMSDConfig * Config, char *ID)
 	return ERR_NONE;
 }
 
+GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const char *destination, const char *headers,
+                                   SBUFFER MMSBuffer)
+{
+	GSM_Error error;
+	SQL_result res;
+	SBUFFER buf = SB_InitWithCapacity(4096);
+	const char * from = Config->gsm->CurrentConfig->PhoneNumber;
+	struct GSM_SMSDdbobj *db = Config->db;
+
+	SB_PutFormattedString(buf,
+	                      "select \"ID\", \"MediaType\", \"DataLength\", \"Data\" "
+											 "from outbox_mms_parts where \"OUTBOX_ID\" = %ld;", outbox_id);
+	error = SMSDSQL_Query(Config, SBPtr(buf), &res);
+	SB_Destroy(&buf);
+	if(error != ERR_NONE) {
+		SMSD_Log(DEBUG_INFO, Config, "Error reading from database (%s)", __FUNCTION__);
+		return error;
+	}
+
+	if(db->AffectedRows(Config, &res) == 0) {
+		db->FreeResult(Config, &res);
+		return ERR_EMPTY;
+	}
+
+	MMSMESSAGE m = MMSMessage_Init();
+	if(!m) {
+		SMSD_Log(DEBUG_ERROR, Config, "Error allocating MMS message");
+		db->FreeResult(Config, &res);
+		return ERR_MEMORY;
+	}
+
+	MMSMessage_SetMessageType(m, M_SEND_REQ);
+	MMSMessage_SetMessageVersion(m, MMS_VERSION_12);
+	MMSMessage_SetTransactionID(m, -1);
+
+	// TODO: add user supplied headers
+
+	EncodedString es;
+	es.charset = MMS_Charset_FindByID(CHARSET_ASCII);
+	es.text = (STR)from;
+	MMSMessage_CopyAddressFrom(m, &es);
+
+	es.text = (STR)destination;
+	MMSMessage_CopyAddressTo(m, &es);
+
+	while(db->NextRow(Config, &res)) {
+		int part_id = (int)db->GetNumber(Config, &res, 0);
+		const char *media_type = db->GetString(Config, &res, 1);
+		ssize_t data_length = db->GetNumber(Config, &res, 2);
+		CPTR data = db->GetString(Config, &res, 3);
+		MMSMessage_AddPart(m, media_type, data, data_length);
+	}
+	db->FreeResult(Config, &res);
+
+	SB_Clear(MMSBuffer);
+	MMS_EncodeMessage(MMSBuffer, m);
+	MMSMessage_Destroy(&m);
+	Config->MMSOutboxID = outbox_id;
+
+	return error;
+}
+
 /* Find one multi SMS to sending and return it (or return ERR_EMPTY)
  * There is also set ID for SMS
  */
-static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *ID)
+/*static*/ GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *ID)
 {
 	SQL_result res;
 	struct GSM_SMSDdbobj *db = Config->db;
@@ -1042,10 +1105,11 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 	const char *text;
 	size_t text_len;
 	const char *text_decoded;
-	const char *destination;
+	const char *destination = NULL;
 	const char *udh;
 	const char *q;
 	const char *status;
+	long outbox_id;
 	size_t udh_len;
 	SQL_Var vars[3];
 	GSM_Error error;
@@ -1066,7 +1130,8 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 			return ERR_EMPTY;
 		}
 
-		sprintf(ID, "%ld", (long)db->GetNumber(Config, &res, 0));
+		outbox_id = (long)db->GetNumber(Config, &res, 0);
+		sprintf(ID, "%ld", outbox_id);
 		timestamp = db->GetDate(Config, &res, 1);
 
 		db->FreeResult(Config, &res);
@@ -1127,7 +1192,7 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 			text_len = strlen(text);
 		}
 		udh = db->GetString(Config, &res, 2);
-		sms->SMS[sms->Number].Class = (int)db->GetNumber(Config, &res, 3);
+		sms->SMS[sms->Number].Class = (char)db->GetNumber(Config, &res, 3);
 		text_decoded = db->GetString(Config, &res, 4);
 		if (udh == NULL) {
 			udh_len = 0;
@@ -1195,10 +1260,22 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		sms->SMS[sms->Number].UDH.Type = UDH_NoUDH;
 		if (udh != NULL && udh_len != 0) {
 			sms->SMS[sms->Number].UDH.Type = UDH_UserUDH;
-			sms->SMS[sms->Number].UDH.Length = udh_len / 2;
+			sms->SMS[sms->Number].UDH.Length = (int)udh_len / 2;
 			if (! DecodeHexBin(sms->SMS[sms->Number].UDH.Text, udh, udh_len)) {
 				SMSD_Log(DEBUG_ERROR, Config, "Failed to decode UDH HEX string: %s", udh);
 				return ERR_UNKNOWN;
+			}
+		}
+
+		if(i == 1) {
+			error = SMSDSQL_PrepareOutboxMMS(Config, outbox_id, destination, text_decoded, Config->MMSBuffer);
+			if(error != ERR_NONE && error != ERR_EMPTY) {
+				db->FreeResult(Config, &res);
+				return error;
+			}
+
+			if(error != ERR_EMPTY) {
+				error = MMS_MESSAGE_TO_SEND;
 			}
 		}
 
@@ -1222,7 +1299,7 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		}
 	}
 
-	return ERR_NONE;
+	return error;
 }
 
 /* After sending SMS is moved to Sent Items or Error Items. */

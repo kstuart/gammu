@@ -36,8 +36,7 @@ ssize_t DecodeValueLength(SBUFFER stream)
 	return MMS_DecodeUintVar(stream);
 }
 
-
-float MMS_DecodeQValue(SBUFFER stream, MMSVALUE out)
+MMSError MMS_DecodeQValue(SBUFFER stream, MMSVALUE out)
 {
 	size_t ui = MMS_DecodeUintVar(stream);
 	if (ui > 1100)
@@ -95,7 +94,7 @@ MMSError MMS_DecodeInteger(SBUFFER stream, MMSVALUE out)
 
 MMSVALUEENUM DecodeWellKnownCharset(SBUFFER stream)
 {
-	if(SB_PeekByte(stream) == ANY_CHARSET) {
+	if(SB_PeekByte(stream) == CHARSET_ANY) {
 		SB_NextByte(stream);
 		return MMS_Charset_FindByID(0);
 	}
@@ -107,20 +106,6 @@ MMSVALUEENUM DecodeWellKnownCharset(SBUFFER stream)
 		v.type == VT_SHORT_INT ? (int) v.v.short_int : (int) v.v.long_int);
 
 	return e;
-}
-
-MMSError MMS_DecodeText(SBUFFER stream, MMSVALUE out)
-{
-	BYTE b = SB_PeekByte(stream);
-	if(b < 32 || b > 127)
-		return MMS_ERR_INVALID_DATA;
-
-	out->allocated = 0;
-	out->type = VT_TEXT;
-	out->v.str = SBPtr(stream);
-	SB_Seek(stream, SB_FindNext(stream, 0) + 1, SEEK_CUR);
-
-	return MMS_ERR_NONE;
 }
 
 MMSError MMS_DecodeQuoteText(SBUFFER stream, MMSVALUE out)
@@ -136,20 +121,48 @@ MMSError MMS_DecodeQuoteText(SBUFFER stream, MMSVALUE out)
 	return MMS_ERR_NONE;
 }
 
+MMSError MMS_DecodeText(SBUFFER stream, MMSVALUE out)
+{
+	BYTE b = SB_PeekByte(stream);
+	if(b < 32)
+		return MMS_ERR_INVALID_DATA;
+
+	return MMS_DecodeQuoteText(stream, out);
+}
+
+
 MMSError MMS_DecodeEncodedText(SBUFFER stream, MMSVALUE out)
 {
+	size_t vlsize = SBOffset(stream);
 	ssize_t len = DecodeValueLength(stream);
+	vlsize = SBOffset(stream) - vlsize;
 	if(len == -1)
 		return MMS_DecodeQuoteText(stream, out);
 
 	MMSVALUEENUM charset = DecodeWellKnownCharset(stream);
 	MMSValue v;
-	MMS_DecodeQuoteText(stream, &v);
+
+	if(charset->code == CHARSET_ASCII) {
+		MMS_DecodeQuoteText(stream, out);
+		out->v.encoded_string.text = out->v.str;
+	}
+	else {
+		out->v.encoded_string.text = SBPtr(stream);
+		SB_Seek(stream, SEEK_CUR, len - vlsize);
+	}
 
 	out->allocated = 0;
 	out->type = VT_ENCODED_STRING;
 	out->v.encoded_string.charset = charset;
-	out->v.encoded_string.string = v.v.str;
+
+	return MMS_ERR_NONE;
+}
+
+MMSError MMS_DecodeAddress(SBUFFER stream, MMSVALUE out)
+{
+	MMSError e = MMS_DecodeEncodedText(stream, out);
+	if(e != MMS_ERR_NONE)
+		return e;
 
 	return MMS_ERR_NONE;
 }
@@ -161,13 +174,18 @@ MMSError MMS_DecodeFromAddress(SBUFFER stream, MMSVALUE out)
 		return MMS_ERR_BADLENGTH;
 
 	BYTE token = SB_NextByte(stream);
-	if(token == TOK_ADDRESS_PRESENT)
-		return MMS_DecodeEncodedText(stream, out);
+	if(token != TOK_ADDRESS_PRESENT) {
+		out->allocated = 0;
+		out->type = VT_FROM;
+		out->v.str = (char*)"";
+		return MMS_ERR_NONE;
+	}
 
-	out->allocated = 0;
+	MMSError e = MMS_DecodeAddress(stream, out);
+	if(e != MMS_ERR_NONE)
+		return e;
+
 	out->type = VT_FROM;
-	out->v.str = (char*)"";
-
 	return MMS_ERR_NONE;
 }
 
@@ -261,14 +279,14 @@ MMSError MMS_DecodeMessageType(SBUFFER stream, MMSVALUE out)
 
 MMSError MMS_DecodeWellKnownCharset(SBUFFER stream, MMSVALUE out)
 {
-	MMSError error = MMS_DecodeShortInteger(stream, out);
+	MMSError error = MMS_DecodeInteger(stream, out);
 	if(error != MMS_ERR_NONE)
 		return error;
 
-	MMSVALUEENUM charset = MMS_Charset_FindByID(out->v.short_int);
+	MMSVALUEENUM charset = MMS_Charset_FindByID(
+		out->type == VT_SHORT_INT ? out->v.short_int : out->v.long_int);
 	if(!charset)
 		return MMS_ERR_INVALID_DATA;
-
 	MMSValue_SetEnum(out, VT_WK_CHARSET, charset);
 
 	return MMS_ERR_NONE;
@@ -297,7 +315,7 @@ MMSError MMS_DecodeTypedParameter(SBUFFER stream, MMSPARAMETER param)
 	if(error != MMS_ERR_NONE)
 		return error;
 
-	MMSFIELDINFO fi = MMS_WellKnownParams_FindByID(v.v.short_int);
+	MMSFIELDINFO fi = MMS_WkParams_FindByID(v.v.short_int);
 	if(!fi)
 		return MMS_ERR_INVALID_PARAM;
 
@@ -354,7 +372,10 @@ MMSError MMS_DecodeParameters(SBUFFER stream, CPTR end, MMSPARAMETERS out)
 	MMSError error = MMS_ERR_INVALID_DATA;
 	MMSParameters params;
 
-	assert(!params.entries);
+	assert(!out->entries);
+
+	if(SBPtr(stream) == (char*)end)
+		return MMS_ERR_NONE;
 
 	params.entries = malloc(MMS_MAX_PARAMS * sizeof(MMSParameter));
 	if(!params.entries)
@@ -437,7 +458,7 @@ MMSError MMS_DecodeContentGeneralForm(SBUFFER stream, MMSVALUE out)
  * Media-type = (Well-known-media | Extension-Media) *(Parameter)
  * Constrained-media = Constrained-encoding
  */
-MMSError MMS_ContentTypeDecode(SBUFFER stream, MMSVALUE out)
+MMSError MMS_DecodeContentType(SBUFFER stream, MMSVALUE out)
 {
 	MMSError error;
 	MMSValue v;
@@ -460,14 +481,25 @@ MMSError MMS_ContentTypeDecode(SBUFFER stream, MMSVALUE out)
 	return error;
 }
 
-MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSValue *out)
+MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSVALUE out)
 {
+	assert(stream);
+	assert(fi);
+	assert(out);
+
 	switch(fi->vt) {
 		default:
-			printf("unsupported codec (%d, %s)\n", fi->id, fi->name);
+			printf("unsupported codec (%d, %s)\n", fi->code, fi->name);
 			return MMS_ERR_NOCODEC;
 		case VT_SHORT_INT:
 			MMS_DecodeShortInteger(stream, out);
+			switch(fi->code) {
+				default:
+					break;
+				case MMS_MMS_VERSION:
+					out->type = VT_VERSION;
+					break;
+			}
 			break;
 		case VT_MESSAGE_TYPE:
 			MMS_DecodeMessageType(stream, out);
@@ -483,6 +515,18 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSValue *out)
 			break;
 		case VT_ENCODED_STRING:
 			MMS_DecodeEncodedText(stream, out);
+			switch(fi->code) {
+				default:
+					break;
+				case MMS_FROM:
+					out->type = VT_FROM;
+					break;
+				case MMS_TO:
+				case MMS_BCC:
+				case MMS_CC:
+					out->type = VT_ADDRESS;
+					break;
+			}
 			break;
 		case VT_MESSAGE_CLASS:
 			MMS_DecodeMessageClass(stream, out);
@@ -494,7 +538,7 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSValue *out)
 			MMS_DecodeYesNo(stream, out);
 			break;
 		case VT_CONTENT_TYPE:
-			MMS_ContentTypeDecode(stream, out);
+			MMS_DecodeContentType(stream, out);
 			break;
 		case VT_WK_CHARSET:
 			MMS_DecodeWellKnownCharset(stream, out);

@@ -41,6 +41,7 @@ ssize_t SB_FindNext(SBUFFER buffer, unsigned char ch);
 int SB_PutByte(SBUFFER buffer, unsigned char byte);
 ssize_t SB_PutBytes(SBUFFER buffer, const void *src, size_t nbytes);
 int SB_PutAsEncodedBase64(SBUFFER buffer, void *data, size_t nbytes);
+int SB_PutAsBinHex(SBUFFER buffer, void *data, size_t nbytes);
 int SB_PutString(SBUFFER buffer, const char *string);
 int SB_PutFormattedString(SBUFFER buffer, const char *fmt, ...);
 ssize_t SB_GetBytes(SBUFFER buffer, void *dest, size_t nbytes);

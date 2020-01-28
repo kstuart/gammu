@@ -10,6 +10,7 @@ set (LIBRARY_SRC
     services/null.c
     mms-data.c
     mms-decoders.c
+    mms-encoders.c
     mms-tables.c
     mms-service.c
     mms-mobiledata.c

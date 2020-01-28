@@ -112,6 +112,10 @@ typedef struct {
 	 * AT protocol.
 	 */
 	 int CNMIParams[5];
+	 /**
+	  * The device phone number
+	  */
+	  char PhoneNumber[GSM_MAX_NUMBER_LENGTH + 1];
 } GSM_Config;
 
 /**
