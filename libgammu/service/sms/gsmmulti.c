@@ -6,6 +6,7 @@
 
 #include <gammu-unicode.h>
 #include <gammu-debug.h>
+#include <assert.h>
 
 #include "gsmmulti.h"
 #include "../gsmring.h"
@@ -15,6 +16,8 @@
 #include "gsmems.h"
 #include "../gsmdata.h"
 #include "../gsmnet.h"
+#include "../../../smsd/mms-service.h"
+#include "../../../smsd/streambuffer.h"
 
 /* ----------------- Splitting SMS into parts ------------------------------ */
 
@@ -1024,6 +1027,19 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 		dbgprintf(di, "Unsupported WSP PDU type: 0x%02x\n", Buffer[1]);
 		return FALSE;
 	}
+
+	int offset = Buffer[2] + 3;
+	SBUFFER stream = SB_MapBuffer(&Buffer[offset], Length - offset);
+	MMSHEADERS headers = MMSHeaders_InitWithCapacity(14);
+	MMSError merr = MMS_MapEncodedHeaders(stream, headers);
+	assert(merr == MMS_ERR_NONE);
+	SBUFFER b = SB_InitWithCapacity(4096);
+	MMS_DumpHeaders(b, headers);
+	SB_PutByte(b, 0);
+	dbgprintf(di, "MMS PDU Headers\n%s\n", SBBase(b));
+	MMSHeaders_Destroy(&headers);
+	SB_Destroy(&b);
+
 	/*
 	 * WSP Push PDU follows:
 	 *
