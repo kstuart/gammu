@@ -130,7 +130,7 @@ MMSFieldInfo MMSFields[] = {
 	{MMS_DATE,              "Date",                   VT_LONG_INT},
 	{MMS_DELIVERY_REPORT,   "X-Mms-Delivery-Report",  VT_YESNO},
 	{MMS_DELIVERY_TIME,     "X-Mms-Delivery-Time",    VT_DTIME},
-	{MMS_EXPIRY,            "X-Mms-Expiry",           VT_DTIME},
+	{MMS_EXPIRY,            "X-Mms-Expiry",           VT_EXPIRY},
 	{MMS_FROM,              "From",                   VT_FROM},
 	{MMS_MESSAGE_CLASS,     "X-Mms-Message-Class",    VT_MESSAGE_CLASS},
 	{MMS_MESSAGE_ID,        "Message-ID",             VT_TEXT},

@@ -116,28 +116,36 @@ MMSError MMS_MapEncodedMessage(GSM_SMSDConfig *Config, SBUFFER Stream, MMSMESSAG
 {
 	MMSError error;
 	MMSHEADERS headers;
-	MMSMESSAGE msg = MMSMessage_Init();
-	if(!msg)
+	MMSMESSAGE m = MMSMessage_Init();
+	if(!m)
 		return MMS_ERR_MEMORY;
 
-	error = MMS_MapEncodedHeaders(Stream, msg->Headers);
+	error = MMS_MapEncodedHeaders(Stream, m->Headers);
 	if(error != MMS_ERR_NONE) {
-		MMSMessage_Destroy(&msg);
+		MMSMessage_Destroy(&m);
 		return error;
 	}
 
-	headers = msg->Headers;
+	headers = m->Headers;
 	MMSHEADER h = MMSHeader_FindByID(headers, MMS_HEADER, MMS_MESSAGE_TYPE);
-	assert(h && h->value.type == VT_MESSAGE_TYPE);
-	msg->MessageType = h->value.v.enum_v;
+	if(!h)
+		return MMS_ERR_REQUIRED_FIELD;
 
-	error = MMS_MapEncodedParts(Stream, msg->Parts);
+	m->MessageType = h->value.v.enum_v;
+
+	h = MMSHeader_FindByID(headers, MMS_HEADER, MMS_MMS_VERSION);
+	if(!h)
+		return MMS_ERR_REQUIRED_FIELD;
+
+	m->Version = h->value.v.short_int;
+
+	error = MMS_MapEncodedParts(Stream, m->Parts);
 	if(error != MMS_ERR_NONE) {
-		MMSMessage_Destroy(&msg);
+		MMSMessage_Destroy(&m);
 		return error;
 	}
 
-	*out = msg;
+	*out = m;
 
 	return MMS_ERR_NONE;
 }

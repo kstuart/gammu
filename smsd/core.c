@@ -77,8 +77,7 @@
 #endif
 #endif
 
-
-
+GSM_Error SaveMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inbox_id);
 GSM_Error SMSD_ProcessSMSInfoCache(GSM_SMSDConfig *Config);
 
 const char smsd_name[] = "gammu-smsd";
@@ -1426,6 +1425,36 @@ GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config, SBUFFER MMSBuffer)
 		SMSD_LogError(DEBUG_ERROR, Config, "Failed to post MMS to server", error);
 }
 
+GSM_Error ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
+{
+	MMSMESSAGE mms = NULL;
+	GSM_Error error = SMSD_FetchMMS(Config, MMSIndicator);
+	if (error != ERR_NONE) {
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to retrieve MMS");
+		return ERR_ABORTED;
+	}
+
+	if (MMS_MapEncodedMessage(Config, Config->MMSBuffer, &mms) != MMS_ERR_NONE) {
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to parse MMS Message");
+		assert(mms == NULL);
+		return ERR_ABORTED;
+	}
+
+	SMSD_Log(DEBUG_NOTICE, Config, "Received MMS of type: %s", mms->MessageType->name);
+	switch(mms->MessageType->code) {
+		case M_SEND_CONF:
+			SMSD_Log(DEBUG_INFO, Config, "MMS of this type is currently not supported");
+			return ERR_NONE;
+		case M_RETRIEVE_CONF:
+			return SaveMMS(Config, mms, inbox_id);
+		case M_DELIVERY_IND:
+			SMSD_Log(DEBUG_INFO, Config, "MMS of this type is currently not supported");
+			return ERR_NONE;
+	}
+
+	return error;
+}
+
 /**
  * Does any processing required for single message after it has been accepted.
  *
@@ -1751,8 +1780,10 @@ GSM_Error SMSD_SendSMS(GSM_SMSDConfig *Config)
 			SMSD_Log(DEBUG_INFO, Config, "Error sending MMS (%s)", Config->SMSID);
 			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_ERROR, -1);
 		}
-		Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_OK, -1);
-		Config->Service->MoveSMS(&sms,Config, Config->SMSID, TRUE,FALSE);
+		else {
+			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_OK, -1);
+		}
+		Config->Service->MoveSMS(&sms, Config, Config->SMSID, TRUE, FALSE);
 
 		return error;
 	}

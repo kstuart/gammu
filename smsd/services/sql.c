@@ -38,6 +38,7 @@
 
 #include "../../libgammu/gsmstate.h"
 
+#define MMS_MARKER ("5f5f4d4d535f5f0a")
 GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator);
 
 /**
@@ -754,22 +755,10 @@ GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, MMSM
 	return  error;
 }
 
-GSM_Error SaveMMS(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
+GSM_Error SaveMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inbox_id)
 {
+	GSM_Error error;
 	SQL_result result;
-	MMSMESSAGE mms = NULL;
-	GSM_Error error = SMSD_FetchMMS(Config, MMSIndicator);
-	if (error != ERR_NONE) {
-		SMSD_Log(DEBUG_ERROR, Config, "Failed to retrieve MMS");
-		return ERR_ABORTED;
-	}
-
-	if (MMS_MapEncodedMessage(Config, Config->MMSBuffer, &mms) != MMS_ERR_NONE) {
-		SMSD_Log(DEBUG_ERROR, Config, "Failed to parse MMS Message");
-		assert(mms == NULL);
-		return ERR_ABORTED;
-	}
-
 	SBUFFER buf = SB_InitWithCapacity(20480);
 	SB_PutString(buf, "update inbox set \"TextDecoded\" = '");
 	MMS_DumpHeaders(buf, mms->Headers);
@@ -791,6 +780,8 @@ GSM_Error SaveMMS(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIn
 
 	return error;
 }
+
+GSM_Error ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator);
 
 /* Save SMS from phone (called Inbox sms - it's in phone Inbox) somewhere */
 static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char **Locations)
@@ -925,7 +916,7 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
 				for (int n = 0; n < SMSInfo.EntriesNum; n++) {
 					if (SMSInfo.Entries[n].ID == SMS_MMSIndicatorLong) {
-						error = SaveMMS(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
+						error = ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
 						if(error != ERR_NONE) {
 							GSM_FreeMultiPartSMSInfo(&SMSInfo);
 							return error;
@@ -1039,24 +1030,12 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	struct GSM_SMSDdbobj *db = Config->db;
 
 	SB_PutFormattedString(buf,
-	                      "select \"ID\", \"MediaType\", \"DataLength\", \"Data\" "
+	                      "select \"MediaType\", \"DataLength\", \"Data\", \"End\" "
 											 "from outbox_mms_parts where \"OUTBOX_ID\" = %ld;", outbox_id);
-	error = SMSDSQL_Query(Config, SBPtr(buf), &res);
-	SB_Destroy(&buf);
-	if(error != ERR_NONE) {
-		SMSD_Log(DEBUG_INFO, Config, "Error reading from database (%s)", __FUNCTION__);
-		return error;
-	}
-
-	if(db->AffectedRows(Config, &res) == 0) {
-		db->FreeResult(Config, &res);
-		return ERR_EMPTY;
-	}
 
 	MMSMESSAGE m = MMSMessage_Init();
 	if(!m) {
 		SMSD_Log(DEBUG_ERROR, Config, "Error allocating MMS message");
-		db->FreeResult(Config, &res);
 		return ERR_MEMORY;
 	}
 
@@ -1074,14 +1053,49 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	es.text = (STR)destination;
 	MMSMessage_CopyAddressTo(m, &es);
 
-	while(db->NextRow(Config, &res)) {
-		int part_id = (int)db->GetNumber(Config, &res, 0);
-		const char *media_type = db->GetString(Config, &res, 1);
-		ssize_t data_length = db->GetNumber(Config, &res, 2);
-		CPTR data = db->GetString(Config, &res, 3);
-		MMSMessage_AddPart(m, media_type, data, data_length);
+	time_t timeout = time(NULL) + 5;
+	int done = 0;
+	int last_row = 0;
+	while(TRUE) {
+		error = SMSDSQL_Query(Config, SBPtr(buf), &res);
+		if(error != ERR_NONE)
+			break;
+
+		int rows_fetched = (int)db->AffectedRows(Config, &res);
+		int current_row = 0;
+
+		if(rows_fetched)
+			while(db->NextRow(Config, &res)) {
+				if(current_row < last_row) {
+					current_row++;
+					continue;
+				}
+				const char *media_type = db->GetString(Config, &res, 0);
+				ssize_t data_length = db->GetNumber(Config, &res, 1);
+				CPTR data = db->GetString(Config, &res, 2);
+				done = (int)db->GetNumber(Config, &res, 3);
+				MMSMessage_AddPart(m, media_type, data, data_length);
+			}
+
+		if(done)
+			break;
+
+		last_row = rows_fetched;
+
+		usleep(800000);
+		if (time(NULL) > timeout) {
+			error = ERR_TIMEOUT;
+			break;
+		}
 	}
+
 	db->FreeResult(Config, &res);
+	SB_Destroy(&buf);
+
+	if(error != ERR_NONE) {
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to retrieve all MMS parts from database");
+		return error;
+	}
 
 	SB_Clear(MMSBuffer);
 	MMS_EncodeMessage(MMSBuffer, m);
@@ -1257,25 +1271,25 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			CopyUnicodeString(sms->SMS[sms->Number].Number, sms->SMS[0].Number);
 		}
 
-		sms->SMS[sms->Number].UDH.Type = UDH_NoUDH;
-		if (udh != NULL && udh_len != 0) {
-			sms->SMS[sms->Number].UDH.Type = UDH_UserUDH;
-			sms->SMS[sms->Number].UDH.Length = (int)udh_len / 2;
-			if (! DecodeHexBin(sms->SMS[sms->Number].UDH.Text, udh, udh_len)) {
-				SMSD_Log(DEBUG_ERROR, Config, "Failed to decode UDH HEX string: %s", udh);
-				return ERR_UNKNOWN;
-			}
-		}
 
-		if(i == 1) {
+		if(i == 1 && strcmp(udh, MMS_MARKER) == 0) {
 			error = SMSDSQL_PrepareOutboxMMS(Config, outbox_id, destination, text_decoded, Config->MMSBuffer);
 			if(error != ERR_NONE && error != ERR_EMPTY) {
 				db->FreeResult(Config, &res);
 				return error;
 			}
 
-			if(error != ERR_EMPTY) {
+			if(error != ERR_EMPTY)
 				error = MMS_MESSAGE_TO_SEND;
+		}
+
+		sms->SMS[sms->Number].UDH.Type = UDH_NoUDH;
+		if (udh != NULL && udh_len != 0 && error != MMS_MESSAGE_TO_SEND) {
+			sms->SMS[sms->Number].UDH.Type = UDH_UserUDH;
+			sms->SMS[sms->Number].UDH.Length = (int)udh_len / 2;
+			if (! DecodeHexBin(sms->SMS[sms->Number].UDH.Text, udh, udh_len)) {
+				SMSD_Log(DEBUG_ERROR, Config, "Failed to decode UDH HEX string: %s", udh);
+				return ERR_UNKNOWN;
 			}
 		}
 

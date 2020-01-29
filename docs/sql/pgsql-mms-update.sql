@@ -16,5 +16,6 @@ create table outbox_mms_parts
     "OUTBOX_ID" integer,
     "MediaType" varchar(255),
     "DataLength" integer not null,
-    "Data" bytea
+    "Data" bytea,
+    "End" integer
 );

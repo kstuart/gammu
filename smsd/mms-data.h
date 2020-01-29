@@ -27,6 +27,7 @@ typedef uint8_t MMSShortInt;
 typedef uint32_t MMSLongInt;
 typedef uint32_t MMSUint;
 typedef float MMSQValue;
+typedef MMSShortInt MMSVersion;
 
 typedef int64_t LocalTXID;
 
@@ -74,13 +75,26 @@ enum {
 	Q_TOKEN = 128,
 	TEXT_QUOTE = 127,
 	LENGTH_QUOTE = 31,
-	TOK_ADDRESS_PRESENT = 128,
-	TOK_ADDRESS_INSERT = 129,
 	CHARSET_ANY = 128,
 	CHARSET_ASCII = 3,
 	CHARSET_UTF8 = 106,
 	CHARSET_DEFAULT = CHARSET_UTF8,
 };
+
+typedef enum _MMSFromAddressToken {
+	TOK_ADDRESS_PRESENT = 128,
+	TOK_ADDRESS_INSERT = 129,
+} MMSFromAddressToken;
+
+typedef enum _MMSExpiryToken {
+	DTIME_ABSOLUTE = 128,
+	DTIME_RELATIVE = 129,
+} MMSExpiryToken;
+
+typedef struct _ExpiryValue {
+	MMSExpiryToken token;
+	MMSLongInt dtime;
+} ExpiryValue;
 
 typedef enum _MMSFieldKind {
 	WSP_HEADER = 0x01,
@@ -113,7 +127,8 @@ typedef enum _MMSValueType {
 	VT_WK_MEDIA,
 	VT_CONSTRAINED,
 	VT_QVALUE,
-	VT_UNSUPPORTED
+	VT_EXPIRY,
+	VT_UNSUPPORTED,
 } MMSValueType;
 
 
@@ -175,6 +190,7 @@ typedef struct _MMSValue {
 		MMSVALUEENUM enum_v;
 		MMSContentType content_type;
 		LocalTXID local_txid;
+		ExpiryValue expiry;
 		float float_v;
 	} v;
 } MMSValue;
@@ -246,7 +262,7 @@ typedef MMSParts *MMSPARTS;
 typedef struct _MMSMessage {
 	MMSVALUEENUM MessageType;
 	STR id;
-	MMSVALUE Version;
+	MMSVersion Version;
 	MMSHEADERS Headers;
 	MMSPARTS Parts;
 } MMSMessage;

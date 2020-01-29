@@ -2,6 +2,7 @@
 #define GAMMU_STREAMBUFFER_H
 
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef struct _StreamBuffer *SBUFFER;
 
@@ -11,12 +12,16 @@ typedef enum _SBBError {
 	SB_ERR_BADSEEKORIGIN,
 	SB_ERR_BADSEEKOFFSET,
 	SB_ERR_MEMORY,
+	SB_ERR_MAPPED,
 } SBError;
 
-int IsSB(void *ptr);
+bool IsSB(void *ptr);
+bool SB_IsMapped(SBUFFER b);
 
 SBUFFER SB_Init(void);
 SBUFFER SB_InitWithCapacity(size_t initial_capacity);
+SBUFFER SB_MapBuffer(unsigned char *buffer, size_t length);
+
 ssize_t SB_ResizeIfNeeded(SBUFFER buffer, size_t offset, size_t count);
 ssize_t SB_Grow(SBUFFER buffer, size_t delta);
 ssize_t SB_MinCapacity(SBUFFER buffer, size_t capacity);

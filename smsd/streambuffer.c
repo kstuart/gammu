@@ -16,6 +16,7 @@ typedef struct _StreamBuffer {
 	size_t capacity;
 	size_t offset;
 	size_t end;
+	bool mapped;
 	SBError error;
 	void *base;
 } StreamBuffer;
@@ -26,9 +27,14 @@ SBError SB_LastError(SBUFFER buffer)
 	return buffer->error;
 }
 
-int IsSB(void *ptr)
+bool IsSB(void *ptr)
 {
 	return ptr != NULL && ((SBUFFER)ptr)->magic == DYNABUF_MAGIC;
+}
+
+bool SB_IsMapped(SBUFFER b)
+{
+	return b->mapped;
 }
 
 size_t SBCapacity(SBUFFER buffer)
@@ -38,6 +44,7 @@ size_t SBCapacity(SBUFFER buffer)
 
 	return buffer->capacity;
 }
+
 char *SBBase(SBUFFER buffer)
 {
 	if(!buffer)
@@ -105,6 +112,7 @@ SBUFFER SB_InitWithCapacity(size_t initial_capacity)
 	buffer->capacity = initial_capacity;
 	buffer->offset = 0;
 	buffer->end = 0;
+	buffer->mapped = false;
 	buffer->error = SB_ERR_NONE;
 
 	return buffer;
@@ -115,11 +123,30 @@ SBUFFER SB_Init()
 	return SB_InitWithCapacity(SBUF_DEFAULT_CAPACITY);
 }
 
+SBUFFER SB_MapBuffer(unsigned char *buffer, size_t length)
+{
+	SBUFFER b = (SBUFFER)malloc(sizeof(struct _StreamBuffer));
+	if(!b)
+		return NULL;
+
+	b->magic = DYNABUF_MAGIC;
+	b->base = buffer;
+	b->capacity = length;
+	b->offset = 0;
+	b->end = length;
+	b->mapped = true;
+	b->error = SB_ERR_NONE;
+
+	return b;
+}
+
 void SB_Clear(SBUFFER buffer)
 {
 	assert(buffer);
 	buffer->offset = 0;
-	buffer->end = 0;
+	if(!buffer->mapped)
+		buffer->end = 0;
+
 	buffer->error = SB_ERR_NONE;
 }
 
@@ -128,7 +155,9 @@ void SB_Destroy(SBUFFER *buffer)
 	if(!buffer || *buffer == NULL)
 		return;
 
-	free((*buffer)->base);
+	if(!(*buffer)->mapped)
+		free((*buffer)->base);
+
 	free(*buffer);
 	*buffer = NULL;
 }
@@ -137,6 +166,13 @@ ssize_t SB_Grow(SBUFFER buffer, size_t delta)
 {
 	if(!buffer || delta == 0)
 		return 0;
+
+	buffer->error = SB_ERR_NONE;
+
+	if(buffer->mapped) {
+		buffer->error = SB_ERR_MAPPED;
+		return -1;
+	}
 
 	size_t new_size = buffer->capacity + delta;
 	void *new_base = realloc(buffer->base, new_size);
@@ -154,6 +190,13 @@ ssize_t SB_Grow(SBUFFER buffer, size_t delta)
 ssize_t SB_ResizeIfNeeded(SBUFFER buffer, size_t offset, size_t count)
 {
 	assert(buffer);
+
+	buffer->error = SB_ERR_NONE;
+
+	if(buffer->mapped) {
+		buffer->error = SB_ERR_MAPPED;
+		return -1;
+	}
 
 	ssize_t needed = count + offset;
 	if((ssize_t)buffer->capacity < needed)

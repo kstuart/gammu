@@ -92,6 +92,34 @@ MMSError MMS_DecodeInteger(SBUFFER stream, MMSVALUE out)
 	return MMS_ERR_NONE;
 }
 
+// Expiry-value =
+//  Value-length (Absolute-token Date-value | Relative-token Delta-seconds-value)
+MMSError MMS_DecodeExpiry(SBUFFER stream, MMSVALUE out)
+{
+	MMSError error;
+
+	ssize_t len = DecodeValueLength(stream);
+	if(len == -1)
+		return MMS_ERR_INVALID_DATA;
+
+	MMSExpiryToken tok = SB_PeekByte(stream);
+	if(!(tok == DTIME_ABSOLUTE || tok == DTIME_RELATIVE))
+		return MMS_ERR_INVALID_DATA;
+
+	SB_NextByte(stream);
+	error = MMS_DecodeLongInteger(stream, out);
+	if(error != MMS_ERR_NONE)
+		return error;
+
+	out->allocated = 0;
+	out->type = VT_EXPIRY;
+	out->v.expiry.dtime = out->v.long_int;
+	out->v.expiry.token = tok;
+
+	return MMS_ERR_NONE;
+}
+
+
 MMSVALUEENUM DecodeWellKnownCharset(SBUFFER stream)
 {
 	if(SB_PeekByte(stream) == CHARSET_ANY) {
@@ -130,9 +158,13 @@ MMSError MMS_DecodeText(SBUFFER stream, MMSVALUE out)
 	return MMS_DecodeQuoteText(stream, out);
 }
 
-
+// Encoded-string-value = Text -string | Value-length Char-set Text -string
 MMSError MMS_DecodeEncodedText(SBUFFER stream, MMSVALUE out)
 {
+	MMSError error = MMS_DecodeText(stream, out);
+	if(error == MMS_ERR_NONE)
+		return MMS_ERR_NONE;
+
 	size_t vlsize = SBOffset(stream);
 	ssize_t len = DecodeValueLength(stream);
 	vlsize = SBOffset(stream) - vlsize;
@@ -173,8 +205,8 @@ MMSError MMS_DecodeFromAddress(SBUFFER stream, MMSVALUE out)
 	if(len == -1)
 		return MMS_ERR_BADLENGTH;
 
-	BYTE token = SB_NextByte(stream);
-	if(token != TOK_ADDRESS_PRESENT) {
+	MMSFromAddressToken tok = SB_NextByte(stream);
+	if(tok != TOK_ADDRESS_PRESENT) {
 		out->allocated = 0;
 		out->type = VT_FROM;
 		out->v.str = (char*)"";
@@ -549,6 +581,8 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSVALUE out)
 		case VT_QVALUE:
 			MMS_DecodeQValue(stream, out);
 			break;
+		case VT_EXPIRY:
+			MMS_DecodeExpiry(stream, out);
 	}
 
 	return MMS_ERR_NONE;

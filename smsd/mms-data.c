@@ -76,19 +76,19 @@ MMSError MMSValue_AsString(SBUFFER stream, MMSVALUE v)
 		case VT_ENCODED_STRING:
 		case VT_FROM:
 		case VT_ADDRESS:
-			switch(v->v.encoded_string.charset->code) {
-				default:
-					return MMS_ERR_UNSUPPORTED;
-				case CHARSET_ASCII:
-					SB_PutString(stream, v->v.encoded_string.text);
+				switch(v->v.encoded_string.charset->code) {
+					default:
+						return MMS_ERR_UNSUPPORTED;
+					case CHARSET_ASCII:
+						SB_PutString(stream, v->v.encoded_string.text);
+						break;
+					case CHARSET_UTF8: {
+						int len = MMSEncodedText_Length(&v->v.encoded_string);
+						SB_MinCapacity(b, len / 2 + 1);
+						DecodeUTF8(SBBase(b), v->v.encoded_string.text, len);
+						SB_PutString(stream, SBBase(b));
+					}
 					break;
-				case CHARSET_UTF8: {
-					int len = MMSEncodedText_Length(&v->v.encoded_string);
-					SB_MinCapacity(b, len / 2 + 1);
-					DecodeUTF8(SBBase(b), v->v.encoded_string.text, len);
-					SB_PutString(stream, SBBase(b));
-				}
-				break;
 			}
 			break;
 		case VT_ENUM:

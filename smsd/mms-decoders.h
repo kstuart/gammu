@@ -13,6 +13,7 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSValue *out);
 MMSError MMS_DecodeShortInteger(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeLongInteger(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeInteger(SBUFFER stream, MMSVALUE out);
+MMSError MMS_DecodeExpiry(SBUFFER stream, MMSVALUE out);
 MMSVALUEENUM DecodeWellKnownCharset(SBUFFER stream);
 MMSError MMS_DecodeEncodedText(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeFromAddress(SBUFFER stream, MMSVALUE out);
