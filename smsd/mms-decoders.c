@@ -165,14 +165,15 @@ MMSError MMS_DecodeEncodedText(SBUFFER stream, MMSVALUE out)
 	if(error == MMS_ERR_NONE)
 		return MMS_ERR_NONE;
 
-	size_t vlsize = SBOffset(stream);
+	ssize_t vlsize = SBOffset(stream);
 	ssize_t len = DecodeValueLength(stream);
 	vlsize = SBOffset(stream) - vlsize;
 	if(len == -1)
 		return MMS_DecodeQuoteText(stream, out);
 
 	MMSVALUEENUM charset = DecodeWellKnownCharset(stream);
-	MMSValue v;
+	if(!charset)
+		return MMS_ERR_INVALID_DATA;
 
 	if(charset->code == CHARSET_ASCII) {
 		MMS_DecodeQuoteText(stream, out);
@@ -180,7 +181,7 @@ MMSError MMS_DecodeEncodedText(SBUFFER stream, MMSVALUE out)
 	}
 	else {
 		out->v.encoded_string.text = SBPtr(stream);
-		SB_Seek(stream, SEEK_CUR, len - vlsize);
+		SB_Seek(stream, len - vlsize, SEEK_CUR);
 	}
 
 	out->allocated = 0;
@@ -416,7 +417,7 @@ MMSError MMS_DecodeParameters(SBUFFER stream, CPTR end, MMSPARAMETERS out)
 	memset(params.entries, 0, MMS_MAX_PARAMS * sizeof(MMSParameter));
 
 	params.count = 0;
-	while(SBPtr(stream) < end) {
+	while(SBPtr(stream) < (STR)end) {
 		error = MMS_DecodeTypedParameter(stream, &params.entries[params.count]);
 		if(error != MMS_ERR_NONE)
 			error = MMS_DecodeUntypedParameter(stream, &params.entries[params.count]);

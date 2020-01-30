@@ -19,6 +19,17 @@ typedef enum _IntToStringFmt {
 	FMT_HEX
 } IntToStringFmt;
 
+bool IsASCII(CSTR str)
+{
+	assert(str);
+	const size_t len = strlen(str);
+	for(size_t i = 0; i < len; i++)
+		if(str[i] < 32)
+			return false;
+
+	return true;
+}
+
 const char *IntToStr(unsigned long i, IntToStringFmt fmt)
 {
 	static char buf[(CHAR_BIT * sizeof(unsigned long) - 1) / 3 + 2];
@@ -37,6 +48,14 @@ bool IsEmptyString(CSTR str)
 {
 	return str && strlen(str) > 0 ? false : true;
 }
+
+MMSCHARSET MMS_GetCharset(CSTR str)
+{
+	assert(str);
+	int ch = IsASCII(str) ? CHARSET_ASCII : CHARSET_UTF8;
+	return MMS_Charset_FindByID(ch);
+}
+
 
 // MMSValue
 
@@ -197,7 +216,7 @@ MMSError MMSValue_CopyEncodedStr(MMSVALUE v, MMSValueType t, ENCODEDSTRING str)
 
 	size_t len = MMSEncodedText_Length(str);
 
-	v->v.encoded_string.text = malloc(len);
+	v->v.encoded_string.text = malloc(len + 1);
 	if (!v->v.encoded_string.text)
 		return MMS_ERR_MEMORY;
 
@@ -205,27 +224,83 @@ MMSError MMSValue_CopyEncodedStr(MMSVALUE v, MMSValueType t, ENCODEDSTRING str)
 	v->type = t;
 	v->v.encoded_string.charset = str->charset;
 	memcpy(v->v.encoded_string.text, str->text, len);
+	v->v.encoded_string.text[len] = 0;
 
 	return MMS_ERR_NONE;
 }
 
-MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE value)
+MMSError MMSValue_SetEncodedString(MMSVALUE v, MMSCHARSET ch, CSTR str)
+{
+	assert(v);
+	assert(str);
+
+	if(!ch)
+		ch = MMS_GetCharset(str);
+
+	const size_t len = strlen(str);
+	STR text = malloc(len + 1);
+	if(!text)
+		return MMS_ERR_MEMORY;
+
+	memcpy(text, str, len);
+	text[len] = 0;
+
+	MMSValue_Clear(v);
+	v->allocated = 1;
+	v->type = VT_ENCODED_STRING;
+	v->v.encoded_string.charset = ch;
+	v->v.encoded_string.text = text;
+
+	return MMS_ERR_NONE;
+}
+
+MMSError MMSValue_SetFromString(MMSVALUE v, MMSFIELDINFO fi, CSTR str)
+{
+	assert(v);
+	assert(str);
+	MMSError error;
+
+	switch(fi->vt) {
+		default:
+			printf("No setter for value of %s", fi->name);
+			return MMS_ERR_UNIMPLEMENTED;
+		case VT_ENCODED_STRING:
+			error = MMSValue_SetEncodedString(v, NULL, str);
+	}
+
+	if(error != MMS_ERR_NONE)
+		return error;
+
+	switch(fi->code) {
+		case MMS_BCC:
+		case MMS_CC:
+		case MMS_TO:
+			v->type = VT_ADDRESS;
+			break;
+	}
+
+	return error;
+}
+
+MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE v)
 {
 	assert(stream);
-	assert(value);
+	assert(v);
 
-	switch(value->type) {
+	switch(v->type) {
 		default:
-			printf("missing value type encoder (%d)\n", value->type);
+			printf("missing value type encoder (%d)\n", v->type);
 			return MMS_ERR_NOCODEC;
 		case VT_SHORT_INT:
-			return MMS_EncodeShortInteger(stream, value->v.short_int);
+			return MMS_EncodeShortInteger(stream, v->v.short_int);
 		case VT_LONG_INT:
-			return MMS_EncodeLongInteger(stream, value->v.long_int);
+			return MMS_EncodeLongInteger(stream, v->v.long_int);
+		case VT_ENCODED_STRING:
+			return MMS_EncodeEncodedText(stream, v->v.encoded_string.charset, v->v.encoded_string.text);
 		case VT_FROM:
-			return MMS_EncodeFromAddress(stream, &value->v.encoded_string);
+			return MMS_EncodeFromAddress(stream, &v->v.encoded_string);
 		case VT_ADDRESS:
-			return MMS_EncodeAddress(stream, &value->v.encoded_string);
+			return MMS_EncodeAddress(stream, &v->v.encoded_string);
 		case VT_ENUM:
 		case VT_YESNO:
 		case VT_MESSAGE_TYPE:
@@ -233,19 +308,19 @@ MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE value)
 		case VT_HIDESHOW:
 		case VT_RESPONSE_STATUS:
 		case VT_PRIORITY:
-			return MMS_EncodeShortInteger(stream, value->v.enum_v->code);
+			return MMS_EncodeShortInteger(stream, v->v.enum_v->code);
 		case VT_WK_CHARSET:
-			return MMS_EncodeInteger(stream, value->v.long_int);
+			return MMS_EncodeInteger(stream, v->v.long_int);
 		case VT_CONTENT_TYPE:
-			return MMS_EncodeContentType(stream, value);
+			return MMS_EncodeContentType(stream, v);
 		case VT_LOCAL_TXID:
-			SB_PutAsBinHex(stream, &value->v.local_txid, sizeof(LocalTXID));
+			SB_PutAsBinHex(stream, &v->v.local_txid, sizeof(LocalTXID));
 			SB_PutByte(stream, 0);
 			return MMS_ERR_NONE;
 	}
 }
 
-// MMSHeader
+// MMSFieldInfo
 
 MMSFIELDINFO MMSFieldInfo_FindByID(MMSFieldKind kind, int id)
 {
@@ -258,6 +333,8 @@ MMSFIELDINFO MMSFieldInfo_FindByID(MMSFieldKind kind, int id)
 			return WSPFields_FindByID(id);
 	}
 }
+
+// MMSHeader
 
 void MMSHeader_Clear(MMSHEADER header)
 {
@@ -489,6 +566,7 @@ void MMSMessage_Destroy(MMSMESSAGE *message)
 	if((*message)->id)
 		free((*message)->id);
 
+	free(*message);
 	*message = NULL;
 }
 
@@ -549,14 +627,14 @@ MMSError MMSMessage_SetMessageType(MMSMESSAGE m,  MMSMessageTypeID type)
 	return MMS_ERR_NONE;
 }
 
-MMSError MMSMessage_SetMessageVersion(MMSMESSAGE m, MMS_Version v)
+MMSError MMSMessage_SetMessageVersion(MMSMESSAGE m, MMSVersion v)
 {
 	assert(m);
 	MMSHEADER h = MMSMessage_FindOrNewHeader(m, MMS_HEADER, MMS_MMS_VERSION);
 	if(!h)
 		return MMS_ERR_MEMORY;
 
-	m->Version = &h->value;
+	m->Version = v;
 	return MMSValue_SetShort(&h->value, v);
 }
 
@@ -622,7 +700,6 @@ MMSError MMSMessage_AddPart(MMSMESSAGE m, CSTR media, CPTR data, size_t data_len
 		return MMS_ERR_MEMORY;
 
 	MMSFIELDINFO fi = MMSFields_FindByID(MMS_CONTENT_TYPE);
-	assert(fi);
 	h->id.kind = MMS_HEADER;
 	h->id.info = fi;
 
@@ -632,7 +709,7 @@ MMSError MMSMessage_AddPart(MMSMESSAGE m, CSTR media, CPTR data, size_t data_len
 
 	if(*data == '\\' && *(data + 1) == 'x') {
 		const size_t sz = (strlen(data) - 2) / 2;
-		PBYTE buf = malloc(sz);
+		PBYTE buf = malloc(sz + 1);
 		if(!buf)
 			return MMS_ERR_MEMORY;
 

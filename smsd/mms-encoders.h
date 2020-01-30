@@ -8,7 +8,7 @@ MMSError MMS_EncodeQValue(SBUFFER stream, MMSQValue value);
 MMSError MMS_EncodeShortInteger(SBUFFER stream, MMSShortInt value);
 MMSError MMS_EncodeLongInteger(SBUFFER stream, MMSLongInt value);
 MMSError MMS_EncodeInteger(SBUFFER stream, MMSLongInt value);
-MMSError MMS_EncodeEncodedText(SBUFFER stream, int charset, ENCODEDSTRING text);
+MMSError MMS_EncodeEncodedText(SBUFFER stream, MMSCHARSET charset, CSTR text);
 MMSError MMS_EncodeAddress(SBUFFER stream, ENCODEDSTRING);
 MMSError MMS_EncodeFromAddress(SBUFFER stream, ENCODEDSTRING from);
 MMSError MMS_EncodeTokenText(SBUFFER stream, CSTR text);
@@ -22,7 +22,11 @@ MMSError MMS_EncodeParameters(SBUFFER stream, MMSPARAMETERS params);
 MMSError MMS_EncodeMediaType(SBUFFER stream, MMSCONTENTTYPE value);
 MMSError MMS_EncodeContentGeneralForm(SBUFFER stream, MMSCONTENTTYPE value);
 MMSError MMS_EncodeContentType(SBUFFER stream, MMSVALUE value);
-MMSError MMS_EncodeHeader(SBUFFER stream, MMSHEADER header);
+
+MMSError MMS_EncodeMessage(SBUFFER stream, MMSMESSAGE m);
 MMSError MMS_EncodeHeaders(SBUFFER stream, MMSHEADERS headers);
+MMSError MMS_EncodeHeader(SBUFFER stream, MMSHEADER header);
+MMSError MMS_EncodeParts(SBUFFER stream, MMSPARTS parts);
+MMSError MMS_EncodePart(SBUFFER stream, MMSPART part);
 
 #endif //GAMMU_MMS_ENCODERS_H

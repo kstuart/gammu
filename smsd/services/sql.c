@@ -781,7 +781,7 @@ GSM_Error SaveMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inb
 	return error;
 }
 
-GSM_Error ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator);
+GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator);
 
 /* Save SMS from phone (called Inbox sms - it's in phone Inbox) somewhere */
 static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char **Locations)
@@ -916,7 +916,7 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
 				for (int n = 0; n < SMSInfo.EntriesNum; n++) {
 					if (SMSInfo.Entries[n].ID == SMS_MMSIndicatorLong) {
-						error = ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
+						error = MMS_ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
 						if(error != ERR_NONE) {
 							GSM_FreeMultiPartSMSInfo(&SMSInfo);
 							return error;
@@ -1020,6 +1020,8 @@ static GSM_Error SMSDSQL_UpdateRetries(GSM_SMSDConfig * Config, char *ID)
 	return ERR_NONE;
 }
 
+
+
 GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const char *destination, const char *headers,
                                    SBUFFER MMSBuffer)
 {
@@ -1043,7 +1045,8 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	MMSMessage_SetMessageVersion(m, MMS_VERSION_12);
 	MMSMessage_SetTransactionID(m, -1);
 
-	// TODO: add user supplied headers
+	if(strcasecmp("no", Config->deliveryreport) != 0)
+		MMSMessage_SetDeliveryReport(m, MMS_YESNO_YES);
 
 	EncodedString es;
 	es.charset = MMS_Charset_FindByID(CHARSET_ASCII);
@@ -1052,6 +1055,8 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 
 	es.text = (STR)destination;
 	MMSMessage_CopyAddressTo(m, &es);
+
+	MMS_ParseHeaders(m->Headers, headers);
 
 	time_t timeout = time(NULL) + 5;
 	int done = 0;

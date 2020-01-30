@@ -4,6 +4,7 @@
 #include "mms-data.h"
 #include "streambuffer.h"
 #include "mms-tables.h"
+#include "mms-encoders.h"
 #include "../include/gammu-unicode.h"
 
 MMSError MMS_EncodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSValue *out);
@@ -146,7 +147,7 @@ MMSError MMS_EncodeText(SBUFFER stream, CSTR text)
 	if(IsEmptyString(text))
 		return MMS_EncodeNoValue(stream);
 
-	if(text[0] > 127)
+	if(text[0] < 0)
 		SB_PutByte(stream, TEXT_QUOTE);
 
 	SB_PutString(stream, text);
@@ -329,6 +330,7 @@ MMSError MMS_EncodeContentGeneralForm(SBUFFER stream, MMSCONTENTTYPE value)
 
 	MMS_EncodeValueLength(stream, SBUsed(b));
 	SB_PutBytes(stream, SBBase(b), SBUsed(b));
+	SB_Destroy(&b);
 
 	return MMS_ERR_NONE;
 }
@@ -349,3 +351,148 @@ MMSError MMS_EncodeContentType(SBUFFER stream, MMSVALUE value)
 	}
 }
 
+MMSError MMS_EncodeMessage(SBUFFER stream, MMSMESSAGE m)
+{
+	assert(m);
+	assert(stream);
+
+	MMSHEADERS hdrs = m->Headers;
+	MMSHEADERS hdrs_front = MMSHeaders_InitWithCapacity(3);
+	MMSHEADERS hdrs_rest = MMSHeaders_InitWithCapacity(5);
+
+	for(size_t i = 0; i != hdrs->end; i++) {
+		MMSHEADER group_hdr;
+		MMSHEADER h = &hdrs->entries[i];
+		switch(h->id.info->code) {
+			default:
+				group_hdr = MMSHeaders_NewHeader(hdrs_rest);
+				MMSHeader_ShallowClone(group_hdr, h);
+				break;
+			case MMS_MESSAGE_TYPE:
+			case MMS_TRANSACTION_ID:
+			case MMS_MMS_VERSION:
+				group_hdr = MMSHeaders_NewHeader(hdrs_front);
+				MMSHeader_ShallowClone(group_hdr, h);
+				break;
+		}
+	}
+
+	if(hdrs_front->end != 3) {
+		MMSHeaders_Destroy(&hdrs_front);
+		MMSHeaders_Destroy(&hdrs_rest);
+		return MMS_ERR_REQUIRED_FIELD;
+	}
+
+	MMSHEADER ct = MMSHeaders_FindByID(hdrs_rest, MMS_HEADER, MMS_CONTENT_TYPE);
+	if(!ct) {
+		ct = MMSHeaders_NewHeader(hdrs_rest);
+		if(!ct) {
+			MMSHeaders_Destroy(&hdrs_front);
+			MMSHeaders_Destroy(&hdrs_rest);
+			return MMS_ERR_MEMORY;
+		}
+
+		ct->id.kind = MMS_HEADER;
+		ct->id.info = MMSFields_FindByID(MMS_CONTENT_TYPE);
+		ct->value.type = VT_CONTENT_TYPE;
+		ct->value.v.content_type.vt = VT_WK_MEDIA;
+		ct->value.v.content_type.v.wk_media = MMS_WkContentType_FindByID(0x23);
+	}
+
+	MMS_EncodeHeaders(stream, hdrs_front);
+	MMS_EncodeHeaders(stream, hdrs_rest);
+	MMSHeaders_Destroy(&hdrs_front);
+	MMSHeaders_Destroy(&hdrs_rest);
+
+	MMS_EncodeParts(stream, m->Parts);
+
+	return MMS_ERR_NONE;
+}
+
+MMSError MMS_EncodeHeaders(SBUFFER stream, MMSHEADERS headers)
+{
+	assert(stream);
+	assert(headers);
+
+	MMSError error;
+
+	for(size_t i = 0; i < headers->end; i++) {
+		error = MMS_EncodeHeader(stream, &headers->entries[i]);
+		if(error != MMS_ERR_NONE)
+			return error;
+	}
+
+	return MMS_ERR_NONE;
+}
+
+MMSError MMS_EncodeHeader(SBUFFER stream, MMSHEADER header)
+{
+	assert(stream);
+	assert(header);
+
+	MMSError e = MMS_EncodeShortInteger(stream, header->id.info->code);
+	if(e != MMS_ERR_NONE)
+		return e;
+
+	return MMSValue_Encode(stream, &header->value);
+}
+
+MMSError MMS_EncodeParts(SBUFFER stream, MMSPARTS parts)
+{
+	assert(stream);
+	assert(parts);
+
+	MMSError error;
+
+	error = MMS_EncodeUintVar(stream, parts->end);
+	if(error != MMS_ERR_NONE)
+		return error;
+
+	for(size_t i = 0; i < parts->end; i++)
+		MMS_EncodePart(stream, &parts->entries[i]);
+
+	return MMS_ERR_NONE;
+}
+
+MMSError MMS_EncodePart(SBUFFER stream, MMSPART part)
+{
+	assert(part);
+	assert(stream);
+	MMSError error;
+
+	MMSHeader ct = *MMSHeaders_FindByID(part->headers, MMS_HEADER, MMS_CONTENT_TYPE);
+	if(ct.id.info->vt == VT_NONE)
+		return MMS_ERR_REQUIRED_FIELD;
+
+	MMSHeaders_Remove(part->headers, &ct);
+
+	SBUFFER b = SB_InitWithCapacity(part->data_len);
+	error = MMS_EncodeContentType(b, &ct.value);
+	if(error != MMS_ERR_NONE) {
+		SB_Destroy(&b);
+		return error;
+	}
+
+	error = MMS_EncodeHeaders(b, part->headers);
+	if(error != MMS_ERR_NONE) {
+		SB_Destroy(&b);
+		return error;
+	}
+
+	error = MMS_EncodeUintVar(stream, SBUsed(b));
+	if(error != MMS_ERR_NONE) {
+		SB_Destroy(&b);
+		return error;
+	}
+
+	error = MMS_EncodeUintVar(stream, part->data_len);
+	if(error != MMS_ERR_NONE)
+		return error;
+
+	SB_PutBytes(stream, SBBase(b), SBUsed(b));
+	SB_Destroy(&b);
+
+	SB_PutBytes(stream, part->data, part->data_len);
+
+	return MMS_ERR_NONE;
+}

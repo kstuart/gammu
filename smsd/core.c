@@ -454,7 +454,7 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 		Config->program_name = name;
 	}
 
-	Config->MMSConveyor = &MMSMobileDataConveyor;
+	Config->MMSConveyor = MMSMobileDataConveyor;
 	Config->MMSBuffer = SB_InitWithCapacity(MMS_INIT_BUFFER_SIZE);
 	Config->MMSOutboxID = -1;
 
@@ -1423,9 +1423,11 @@ GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config, SBUFFER MMSBuffer)
 	error = Config->MMSConveyor->SendMMS(Config, MMSBuffer);
 	if(error != ERR_NONE)
 		SMSD_LogError(DEBUG_ERROR, Config, "Failed to post MMS to server", error);
+
+	return error;
 }
 
-GSM_Error ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
+GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
 {
 	MMSMESSAGE mms = NULL;
 	GSM_Error error = SMSD_FetchMMS(Config, MMSIndicator);
@@ -1442,16 +1444,14 @@ GSM_Error ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_i
 
 	SMSD_Log(DEBUG_NOTICE, Config, "Received MMS of type: %s", mms->MessageType->name);
 	switch(mms->MessageType->code) {
-		case M_SEND_CONF:
-			SMSD_Log(DEBUG_INFO, Config, "MMS of this type is currently not supported");
+		default:
+			SMSD_Log(DEBUG_INFO, Config, "MMS of type '%s' is currently not supported", mms->MessageType->name);
 			return ERR_NONE;
 		case M_RETRIEVE_CONF:
 			return SaveMMS(Config, mms, inbox_id);
-		case M_DELIVERY_IND:
-			SMSD_Log(DEBUG_INFO, Config, "MMS of this type is currently not supported");
-			return ERR_NONE;
 	}
 
+	MMSMessage_Destroy(&mms);
 	return error;
 }
 

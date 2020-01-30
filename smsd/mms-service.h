@@ -26,10 +26,6 @@ void SaveSBufferToTempFile(GSM_SMSDConfig *Config, SBUFFER Buffer);
 void MMS_ContentTypeAsString(SBUFFER buffer, MMSContentType *ct);
 
 MMSError MMS_ParseMediaType(CSTR mime, MMSCONTENTTYPE out);
-MMSError MMS_EncodeMessage(SBUFFER stream, MMSMESSAGE m);
-MMSError MMS_EncodeHeaders(SBUFFER stream, MMSHEADERS headers);
-MMSError MMS_EncodeHeader(SBUFFER stream, MMSHEADER header);
-MMSError MMS_EncodeParts(SBUFFER stream, MMSPARTS parts);
-MMSError MMS_EncodePart(SBUFFER stream, MMSPART part);
+MMSError MMS_ParseHeaders(MMSHEADERS headers, CSTR headers_string);
 
 #endif //GAMMU_MMS_SERVICE_H

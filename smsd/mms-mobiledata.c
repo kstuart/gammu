@@ -43,7 +43,7 @@ GSM_Error MobileDataStop(GSM_SMSDConfig *Config)
 	return ERR_NONE;
 }
 
-static size_t WriteMemoryCallback(void *in_ptr, size_t size, size_t in_count, void *arg)
+static size_t ReceiveBufferCallback(void *in_ptr, size_t size, size_t in_count, void *arg)
 {
 	SBUFFER buffer = (SBUFFER)arg;
 	assert(size == 1);
@@ -52,7 +52,7 @@ static size_t WriteMemoryCallback(void *in_ptr, size_t size, size_t in_count, vo
 	return in_count;
 }
 
-size_t ReadMemoryCallback(void *ptr, size_t size, size_t nitems, void *arg) {
+size_t SendBufferCallback(void *ptr, size_t size, size_t nitems, void *arg) {
 	SBUFFER buffer = (SBUFFER)arg;
 	ssize_t bytes_read = SB_GetBytes(buffer, ptr, size * nitems);
 
@@ -75,10 +75,10 @@ static int CURL_DebugLogger(CURL *ch, curl_infotype ci,  char *data, size_t size
 		default:
 			return 0;
 		case CURLINFO_HEADER_OUT:
-			SMSD_Log(DEBUG_NOTICE, Cfg, ">>> Header: %s", buffer);
+			SMSD_Log(DEBUG_NOTICE, Cfg, "Request Header: %s", buffer);
 			break;
 		case CURLINFO_HEADER_IN:
-			SMSD_Log(DEBUG_NOTICE, Cfg, "<<< Header: %s", buffer);
+			SMSD_Log(DEBUG_NOTICE, Cfg, "Response Header: %s", buffer);
 			break;
 	}
 	return 0;
@@ -97,7 +97,7 @@ static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const c
 
 	SMSD_Log(DEBUG_INFO, Config, "Performing HTTP Get with URL %s", URL);
 	curl_easy_setopt(ch, CURLOPT_URL, URL);
-	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, ReceiveBufferCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)Buffer);
 	if(Config->MMSCProxy) {
 		curl_easy_setopt(ch, CURLOPT_PROXY, Config->MMSCProxy);
@@ -141,9 +141,9 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const ch
 
 	curl_easy_setopt(ch, CURLOPT_URL, URL);
 	curl_easy_setopt(ch, CURLOPT_POST, 1L);
-	curl_easy_setopt(ch, CURLOPT_READFUNCTION, ReadMemoryCallback);
+	curl_easy_setopt(ch, CURLOPT_READFUNCTION, SendBufferCallback);
 	curl_easy_setopt(ch, CURLOPT_READDATA, (void*)Buffer);
-	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, ReceiveBufferCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)RespBuffer);
 	if(Config->MMSCProxy) {
 		curl_easy_setopt(ch, CURLOPT_PROXY, Config->MMSCProxy);

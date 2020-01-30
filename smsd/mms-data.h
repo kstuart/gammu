@@ -27,15 +27,14 @@ typedef uint8_t MMSShortInt;
 typedef uint32_t MMSLongInt;
 typedef uint32_t MMSUint;
 typedef float MMSQValue;
-typedef MMSShortInt MMSVersion;
 
 typedef int64_t LocalTXID;
 
-typedef enum _MMS_Version {
+typedef enum _MMSVersion {
 	MMS_VERSION_10 = 0x10,
 	MMS_VERSION_12 = 0x12,
 	MMS_VERSION_1X = 0x1F,
-} MMS_Version;
+} MMSVersion;
 
 typedef enum _MMSMessageTypeID {
 	M_SEND_REQ = 128,
@@ -268,20 +267,23 @@ typedef struct _MMSMessage {
 } MMSMessage;
 typedef MMSMessage *MMSMESSAGE;
 
+bool IsASCII(CSTR str);
 bool IsEmptyString(CSTR str);
+MMSCHARSET MMS_GetCharset(CSTR str);
 size_t GetTextLength(MMSCHARSET charset, CSTR text);
 int MMSEncodedText_Length(ENCODEDSTRING s);
-LocalTXID CreateTransactionID(void);
 
 void MMSValue_Init(MMSVALUE v);
 void MMSValue_Clear(MMSVALUE value);
 MMSError MMSValue_AsString(SBUFFER stream, MMSVALUE v);
+MMSError MMSValue_SetFromString(MMSVALUE v, MMSFIELDINFO fi, CSTR str);
 MMSError MMSValue_SetEnum(MMSVALUE out, MMSValueType vt, MMSVALUEENUM entry);
 MMSError MMSValue_SetShort(MMSVALUE out, MMSShortInt value);
+MMSError MMSValue_SetEncodedString(MMSVALUE v, MMSCHARSET ch, CSTR str);
 MMSError MMSValue_SetLocalTransactionID(MMSVALUE out, LocalTXID value);
 MMSError MMSValue_CopyEncodedStr(MMSVALUE v, MMSValueType t, ENCODEDSTRING str);
 MMSError MMSValue_CopyStr(MMSVALUE v, MMSValueType t, CSTR str);
-MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE value);
+MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE v);
 
 void MMSHeader_Clear(MMSHEADER header);
 void MMSHeader_ShallowClone(MMSHEADER dest, MMSHEADER src);
@@ -313,7 +315,7 @@ MMSHEADER MMSMessage_FindOrNewHeader(MMSMESSAGE m, MMSFieldKind kind, int id);
 MMSError MMSMessage_AddPart(MMSMESSAGE m, CSTR media, CPTR data, size_t data_len);
 
 MMSError MMSMessage_SetMessageType(MMSMESSAGE m,  MMSMessageTypeID type);
-MMSError MMSMessage_SetMessageVersion(MMSMESSAGE m, MMS_Version v);
+MMSError MMSMessage_SetMessageVersion(MMSMESSAGE m, MMSVersion v);
 MMSError MMSMessage_SetTransactionID(MMSMESSAGE m, LocalTXID txid);
 MMSError MMSMessage_SetDeliveryReport(MMSMESSAGE m, MMSVALUEENUM v);
 

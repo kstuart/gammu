@@ -3,6 +3,8 @@
 
 #include "mms-data.h"
 
+typedef MMSVALUEENUM MMSCHARSET;
+
 enum WSPFieldID {
 	WSP_ACCEPT = 0x00,
 	WSP_ACCEPT_CHARSET = 0x01,
@@ -89,13 +91,15 @@ enum MMSFieldID {
 	MMS_TRANSACTION_ID = 0x18
 };
 
+MMSVALUEENUM MMS_YESNO_YES;
+MMSVALUEENUM MMS_YESNO_NO;
 
 MMSFIELDINFO WSPFields_FindByID(int id);
 MMSFIELDINFO MMSFields_FindByID(int id);
 MMSFIELDINFO MMS_WkParams_FindByID(int id);
 MMSVALUEENUM MMS_Charset_FindByID(MMSLongInt id);
 MMSVALUEENUM MMS_WkContentType_FindByID(int id);
-MMSVALUEENUM MMS_MessageType_FindByID(MMSMessageTypeID id);
+MMSVALUEENUM MMS_MessageType_FindByID(int id);
 MMSVALUEENUM MMS_MessageClass_FindByID(int id);
 MMSVALUEENUM MMS_Priority_FindByID(int id);
 MMSVALUEENUM MMS_YesNo_FindByID(int id);

@@ -345,7 +345,7 @@ MMSVALUEENUM MMS_MessageType_FindByName(const char *name)
 	return _EnumLookupByName(MMSMessageTypeEnum, MMSMessageTypeEnumSize, name);
 }
 
-MMSVALUEENUM MMS_MessageType_FindByID(MMSMessageTypeID id)
+MMSVALUEENUM MMS_MessageType_FindByID(int id)
 {
 	return _EncodedEnumQuickLookup(MMSMessageTypeEnum, MMSMessageTypeEnumSize, id);
 }
@@ -392,6 +392,8 @@ MMSValueEnum MMSYesNoEnum[] = {
 	{ "No", 129 },
 };
 size_t MMSYesNoEnumSize = sizeof(MMSYesNoEnum) / sizeof(MMSYesNoEnum[0]);
+MMSVALUEENUM MMS_YESNO_YES = &MMSYesNoEnum[0];
+MMSVALUEENUM MMS_YESNO_NO = &MMSYesNoEnum[1];
 
 MMSVALUEENUM MMS_YesNo_FindByName(const char *name)
 {
