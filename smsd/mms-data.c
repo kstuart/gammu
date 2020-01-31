@@ -575,7 +575,6 @@ void MMSMessage_Destroy(MMSMESSAGE *message)
 	if((*message)->id)
 		free((*message)->id);
 
-	free(*message);
 	*message = NULL;
 }
 
