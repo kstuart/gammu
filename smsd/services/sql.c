@@ -1119,8 +1119,8 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	}
 
 	MMSMessage_SetMessageType(m, M_SEND_REQ);
-	MMSMessage_SetMessageVersion(m, MMS_VERSION_12);
 	MMSMessage_SetTransactionID(m, txid);
+	MMSMessage_SetMessageVersion(m, MMS_VERSION_12);
 
 	if(strcasecmp("no", Config->deliveryreport) != 0)
 		MMSMessage_SetDeliveryReport(m, MMS_YESNO_YES);
