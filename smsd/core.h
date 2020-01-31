@@ -66,10 +66,11 @@ typedef struct {
 	GSM_Error	(*ReadConfiguration) (GSM_SMSDConfig *Config);
 } GSM_SMSDService;
 
-typedef struct _Buffer {
-	char *ptr;
-	size_t size;
-} CURLBuffer;
+typedef struct _MMSSentID {
+	long long outboxID;
+	LocalTXID mmsTxID;
+} MMSSentID;
+typedef struct _MMSSentID *MMSSENTID;
 
 struct _GSM_SMSDConfig {
 	const char	*ServiceName;
@@ -221,10 +222,11 @@ struct _GSM_SMSDConfig {
 #endif
 	GSM_SMSDStatus *Status;
 	GSM_SMSDService		*Service;
-	MMSConveyor *MMSConveyor;
+	MMSCONVEYOR MMSConveyor;
 	SBUFFER MMSBuffer;
-	long MMSOutboxID;
+	MMSSentID MMSSendID;
 };
+
 
 extern GSM_Error SMSD_NoneFunction		(void);
 extern GSM_Error SMSD_EmptyFunction		(void);

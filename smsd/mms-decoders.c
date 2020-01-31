@@ -84,6 +84,15 @@ MMSError MMS_DecodeLongInteger(SBUFFER stream, MMSVALUE out)
 	return MMS_ERR_NONE;
 }
 
+MMSError MMS_DecodeDate(SBUFFER stream, MMSVALUE out)
+{
+	MMSError error = MMS_DecodeLongInteger(stream, out);
+	if(error != MMS_ERR_NONE)
+		return error;
+
+	out->type = VT_DATE;
+}
+
 MMSError MMS_DecodeInteger(SBUFFER stream, MMSVALUE out)
 {
 	if(MMS_DecodeShortInteger(stream, out) != MMS_ERR_NONE)
@@ -298,6 +307,11 @@ MMSError MMS_DecodeYesNo(SBUFFER stream, MMSVALUE out)
 MMSError MMS_DecodePriority(SBUFFER stream, MMSVALUE out)
 {
 	return _EncodedQuickFindByID(stream, VT_PRIORITY, out, MMS_Priority_FindByID);
+}
+
+MMSError MMS_DecodeStatusValue(SBUFFER stream, MMSVALUE out)
+{
+	return _EncodedQuickFindByID(stream, VT_STATUS, out, MMS_StatusValue_FindByID);
 }
 
 MMSError MMS_DecodeMessageClass(SBUFFER stream, MMSVALUE out)
@@ -543,6 +557,9 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSVALUE out)
 		case VT_LONG_INT:
 			MMS_DecodeLongInteger(stream, out);
 			break;
+		case VT_DATE:
+			MMS_DecodeDate(stream, out);
+			break;
 		case VT_FROM:
 			MMS_DecodeFromAddress(stream, out);
 			break;
@@ -566,6 +583,9 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSVALUE out)
 			break;
 		case VT_PRIORITY:
 			MMS_DecodePriority(stream, out);
+			break;
+		case VT_STATUS:
+			MMS_DecodeStatusValue(stream, out);
 			break;
 		case VT_YESNO:
 			MMS_DecodeYesNo(stream, out);

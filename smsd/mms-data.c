@@ -82,11 +82,11 @@ MMSError MMSValue_AsString(SBUFFER stream, MMSVALUE v)
 		case VT_LONG_INT:
 			SB_PutString(stream, IntToStr(v->v.long_int, FMT_DECIMAL));
 			break;
-		case VT_DATE:
-			SB_PutString(stream, IntToStr(v->v.long_int, FMT_DECIMAL));
+		case VT_DATE: {
 			char *date = asctime(gmtime((time_t *) &v->v.long_int));
 			date[strlen(date) - 1] = 0;
 			SB_PutString(stream, date);
+		}
 			break;
 		case VT_CONSTRAINED:
 		case VT_TEXT:
@@ -117,6 +117,7 @@ MMSError MMSValue_AsString(SBUFFER stream, MMSVALUE v)
 		case VT_HIDESHOW:
 		case VT_RESPONSE_STATUS:
 		case VT_PRIORITY:
+		case VT_STATUS:
 		case VT_WK_CHARSET:
 			SB_PutString(stream, v->v.enum_v->name);
 			break;
@@ -294,6 +295,7 @@ MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE v)
 		case VT_SHORT_INT:
 			return MMS_EncodeShortInteger(stream, v->v.short_int);
 		case VT_LONG_INT:
+		case VT_DATE:
 			return MMS_EncodeLongInteger(stream, v->v.long_int);
 		case VT_ENCODED_STRING:
 			return MMS_EncodeEncodedText(stream, v->v.encoded_string.charset, v->v.encoded_string.text);
@@ -308,6 +310,7 @@ MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE v)
 		case VT_HIDESHOW:
 		case VT_RESPONSE_STATUS:
 		case VT_PRIORITY:
+		case VT_STATUS:
 			return MMS_EncodeShortInteger(stream, v->v.enum_v->code);
 		case VT_WK_CHARSET:
 			return MMS_EncodeInteger(stream, v->v.long_int);
@@ -414,6 +417,9 @@ MMSHEADERS MMSHeaders_InitWithCapacity(int num_headers)
 
 void MMSHeaders_Destroy(MMSHEADERS *headers)
 {
+	if(!*headers)
+		return;
+
 	for(size_t i =0; i < (*headers)->end; i++)
 		MMSHeader_Clear(&(*headers)->entries[i]);
 
@@ -510,6 +516,9 @@ MMSPARTS MMSParts_InitWithCapacity(int num_parts)
 
 void MMSParts_Destroy(MMSPARTS *parts)
 {
+	if(!*parts)
+		return;
+
 	MMSPART part;
 	for(size_t i =0; i < (*parts)->end; i++) {
 		part = &(*parts)->entries[i];
@@ -646,7 +655,7 @@ MMSError MMSMessage_SetTransactionID(MMSMESSAGE m, LocalTXID txid)
 		return MMS_ERR_MEMORY;
 
 	if(txid == -1)
-		txid = CreateTransactionID();
+		txid = MMS_CreateTransactionID();
 
 	return MMSValue_SetLocalTransactionID(&h->value, txid);
 }
@@ -707,6 +716,8 @@ MMSError MMSMessage_AddPart(MMSMESSAGE m, CSTR media, CPTR data, size_t data_len
 	if(error != MMS_ERR_NONE)
 		return error;
 
+	h->value.type = VT_CONTENT_TYPE;
+
 	if(*data == '\\' && *(data + 1) == 'x') {
 		const size_t sz = (strlen(data) - 2) / 2;
 		PBYTE buf = malloc(sz + 1);
@@ -731,7 +742,6 @@ MMSError MMSMessage_AddPart(MMSMESSAGE m, CSTR media, CPTR data, size_t data_len
 	}
 
 	p->allocated = true;
-	h->value.type = VT_CONTENT_TYPE;
 
 	return MMS_ERR_NONE;
 }

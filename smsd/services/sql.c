@@ -37,6 +37,7 @@
 #include "../mms-service.h"
 
 #include "../../libgammu/gsmstate.h"
+#include "../mms-data.h"
 
 #define MMS_MARKER ("5f5f4d4d535f5f0a")
 GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator);
@@ -755,7 +756,82 @@ GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, MMSM
 	return  error;
 }
 
-GSM_Error SaveMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inbox_id)
+GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
+{
+	GSM_Error error;
+	SQL_result result;
+	SBUFFER buf = SB_InitWithCapacity(1024);
+	MMSHEADER MessageID, To, Date, Status;
+
+	MessageID = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_MESSAGE_ID);
+	if(!MessageID) {
+		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without a message id");
+		return ERR_INVALIDDATA;
+	}
+	assert(MessageID->value.type == VT_TEXT);
+	STR txid = MessageID->value.v.str;
+
+	To = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_TO);
+	if(!To) {
+		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without the recipient address");
+		return ERR_INVALIDDATA;
+	}
+
+	Date = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_DATE);
+	if(!Date) {
+		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without the received date");
+		return ERR_INVALIDDATA;
+	}
+
+	Status = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_STATUS);
+	if(!Status) {
+		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without a status");
+		return ERR_INVALIDDATA;
+	}
+
+
+	SB_PutFormattedString(buf, "select \"ID\", \"TextDecoded\" from sentitems where \"UDH\" = '%s';", txid);
+	SB_PutByte(buf, 0);
+
+	error = SMSDSQL_Query(Config, SBBase(buf), &result);
+	if(error != ERR_NONE) {
+		Config->db->FreeResult(Config, &result);
+		SB_Destroy(&buf);
+		return error;
+	}
+
+	if(!Config->db->NextRow(Config, &result)) {
+		SMSD_Log(DEBUG_ERROR, Config, "Received delivery report with id '%s' and no corresponding entry in sentitems", txid);
+		Config->db->FreeResult(Config, &result);
+		SB_Destroy(&buf);
+		return ERR_INVALIDDATA;
+	}
+
+	CSTR sent_id = Config->db->GetString(Config, &result, 0);
+	CSTR text_decoded = Config->db->GetString(Config, &result, 1);
+	Config->db->FreeResult(Config, &result);
+
+	SB_Clear(buf);
+	SB_PutFormattedString(buf, "update sentitems set \"Status\" = 'SendingOK', \"TextDecoded\" = '%sTo ", text_decoded);
+	MMSValue_AsString(buf, &To->value);
+	SB_PutString(buf, " on ");
+	MMSValue_AsString(buf, &Date->value);
+	SB_PutString(buf, " Status: ");
+	MMSValue_AsString(buf, &Status->value);
+	SB_PutString(buf, "\n");
+	SB_PutFormattedString(buf, "' where \"ID\" = '%s';", sent_id);
+
+	error = SMSDSQL_Query(Config, SBBase(buf), &result);
+	if(error != ERR_NONE)
+		SMSD_Log(DEBUG_ERROR, Config, "Failed to update DB with delivery report");
+
+	Config->db->FreeResult(Config, &result);
+	SB_Destroy(&buf);
+
+	return error;
+}
+
+GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inbox_id)
 {
 	GSM_Error error;
 	SQL_result result;
@@ -765,12 +841,12 @@ GSM_Error SaveMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inb
 	SB_PutFormattedString(buf, "' where \"ID\" = %d;", inbox_id);
 	SB_PutByte(buf, 0);
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
+	Config->db->FreeResult(Config, &result);
 	if(error != ERR_NONE) {
 		SB_Destroy(&buf);
 		MMSMessage_Destroy(&mms);
 		return error;
 	}
-	Config->db->FreeResult(Config, &result);
 
 	error = SaveMMSParts(Config, inbox_id, mms, buf);
 
@@ -1030,6 +1106,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	SBUFFER buf = SB_InitWithCapacity(4096);
 	const char * from = Config->gsm->CurrentConfig->PhoneNumber;
 	struct GSM_SMSDdbobj *db = Config->db;
+	LocalTXID txid = MMS_CreateTransactionID();
 
 	SB_PutFormattedString(buf,
 	                      "select \"MediaType\", \"DataLength\", \"Data\", \"End\" "
@@ -1043,7 +1120,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 
 	MMSMessage_SetMessageType(m, M_SEND_REQ);
 	MMSMessage_SetMessageVersion(m, MMS_VERSION_12);
-	MMSMessage_SetTransactionID(m, -1);
+	MMSMessage_SetTransactionID(m, txid);
 
 	if(strcasecmp("no", Config->deliveryreport) != 0)
 		MMSMessage_SetDeliveryReport(m, MMS_YESNO_YES);
@@ -1105,7 +1182,9 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	SB_Clear(MMSBuffer);
 	MMS_EncodeMessage(MMSBuffer, m);
 	MMSMessage_Destroy(&m);
-	Config->MMSOutboxID = outbox_id;
+
+	Config->MMSSendID.outboxID = outbox_id;
+	Config->MMSSendID.mmsTxID = txid;
 
 	return error;
 }

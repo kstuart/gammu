@@ -127,7 +127,7 @@ MMSFieldInfo MMSFields[] = {
 	{MMS_CC,                "Cc",                     VT_ENCODED_STRING},
 	{MMS_CONTENT_LOCATION,  "X-Mms-Content-Location", VT_TEXT},
 	{MMS_CONTENT_TYPE,      "Content-Type",           VT_CONTENT_TYPE},
-	{MMS_DATE,              "Date",                   VT_LONG_INT},
+	{MMS_DATE,              "Date",                   VT_DATE},
 	{MMS_DELIVERY_REPORT,   "X-Mms-Delivery-Report",  VT_YESNO},
 	{MMS_DELIVERY_TIME,     "X-Mms-Delivery-Time",    VT_DTIME},
 	{MMS_EXPIRY,            "X-Mms-Expiry",           VT_EXPIRY},
@@ -206,6 +206,7 @@ MMSFIELDINFO MMS_WkParams_FindByID(int id)
 MMSValueEnum MMSCharsetEnum[] = {
 	{"ASCII",           3},
 	{"UTF-8",           106},
+	{"UTF8",           106},
 	{"*",               128},
 	{"big5",            0x07EA},
 	{"iso-10646-ucs-2", 0x03E8},
@@ -404,4 +405,24 @@ MMSVALUEENUM MMS_YesNo_FindByName(const char *name)
 MMSVALUEENUM MMS_YesNo_FindByID(int id)
 {
 	return _EncodedEnumQuickLookup(MMSYesNoEnum, MMSYesNoEnumSize, id);
+}
+
+MMSValueEnum MMSStatusValueEnum[] = {
+	{ "Expired", 128 },
+	{ "Retrieved", 129 },
+	{ "Rejected", 130 },
+	{ "Deferred", 131 },
+	{ "Unrecognised", 132 },
+};
+size_t MMSStatusValueEnumSize = sizeof(MMSStatusValueEnum) / sizeof(MMSStatusValueEnum[0]);
+
+MMSVALUEENUM MMS_StatusValue_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(MMSStatusValueEnum, MMSStatusValueEnumSize, name);
+}
+
+MMSVALUEENUM MMS_StatusValue_FindByID(int id)
+{
+	return _EncodedEnumQuickLookup(MMSStatusValueEnum, MMSStatusValueEnumSize, id);
 }

@@ -77,7 +77,8 @@
 #endif
 #endif
 
-GSM_Error SaveMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inbox_id);
+GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms);
+GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inbox_id);
 GSM_Error SMSD_ProcessSMSInfoCache(GSM_SMSDConfig *Config);
 
 const char smsd_name[] = "gammu-smsd";
@@ -454,9 +455,10 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 		Config->program_name = name;
 	}
 
-	Config->MMSConveyor = MMSMobileDataConveyor;
+	Config->MMSConveyor = &MMSMobileDataConveyor;
 	Config->MMSBuffer = SB_InitWithCapacity(MMS_INIT_BUFFER_SIZE);
-	Config->MMSOutboxID = -1;
+	Config->MMSSendID.outboxID = -1;
+	Config->MMSSendID.mmsTxID = -1;
 
 	return Config;
 }
@@ -1412,7 +1414,7 @@ GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config, SBUFFER MMSBuffer)
 {
 	assert(Config);
 	assert(MMSBuffer);
-	long outbox_id = Config->MMSOutboxID;
+	long outbox_id = Config->MMSSendID.outboxID;
 	GSM_Error error;
 
 	if(outbox_id < 1) {
@@ -1446,9 +1448,14 @@ GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inb
 	switch(mms->MessageType->code) {
 		default:
 			SMSD_Log(DEBUG_INFO, Config, "MMS of type '%s' is currently not supported", mms->MessageType->name);
-			return ERR_NONE;
+			error = ERR_NONE;
+			break;
 		case M_RETRIEVE_CONF:
-			return SaveMMS(Config, mms, inbox_id);
+			error = SaveInboxMMS(Config, mms, inbox_id);
+			break;
+		case M_DELIVERY_IND:
+			error = SaveReportMMS(Config, mms);
+			break;
 	}
 
 	MMSMessage_Destroy(&mms);
@@ -1776,6 +1783,14 @@ GSM_Error SMSD_SendSMS(GSM_SMSDConfig *Config)
 	if(error == MMS_MESSAGE_TO_SEND) {
 		assert(sms.Number == 1);
 		error = SMSD_SendMMS(Config, Config->MMSBuffer);
+
+		memcpy(sms.SMS[0].UDH.Text, &Config->MMSSendID.mmsTxID, sizeof(LocalTXID));
+		sms.SMS[0].UDH.Length = sizeof(LocalTXID);
+		sms.SMS[0].UDH.Type = UDH_UserUDH;
+
+		Config->MMSSendID.outboxID = -1;
+		Config->MMSSendID.mmsTxID = -1;
+
 		if(error != ERR_NONE) {
 			SMSD_Log(DEBUG_INFO, Config, "Error sending MMS (%s)", Config->SMSID);
 			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_ERROR, -1);

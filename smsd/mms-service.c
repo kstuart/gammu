@@ -210,30 +210,7 @@ void MMS_ContentTypeAsString(SBUFFER buffer, MMSContentType *ct)
 	}
 }
 
-MMSError MMS_ParseMediaType(CSTR mime, MMSCONTENTTYPE out)
-{
-	assert(mime);
-	assert(out);
-
-	CSTR end = mime + strlen(mime);
-	STR pos = strchr(mime, ' ');
-	pos = pos ? pos + 1 : (STR)end;
-
-	MMSVALUEENUM wk = MMS_WkContentType_FindByName(mime);
-	if(!wk)
-		return MMS_ERR_UNKNOWN_MIME;
-
-	// TODO: support extension media
-	// TODO: parse parameters
-
-	out->vt = VT_WK_MEDIA;
-	out->v.wk_media = wk;
-
-	return MMS_ERR_NONE;
-}
-
-
-LocalTXID CreateTransactionID(void)
+LocalTXID MMS_CreateTransactionID(void)
 {
 	LocalTXID txid;
 	int fd = open("/dev/urandom", O_RDONLY);
@@ -255,22 +232,22 @@ ssize_t MMS_NextToken(CSTR str, size_t end, size_t offset, char token)
 	return offset >= end ? -1 : (ssize_t)offset + 1;
 }
 
-MMSError MMS_ParseHeaders(MMSHEADERS headers, CSTR headers_string)
+MMSError MMS_ParseHeaders(MMSHEADERS headers, CSTR extra_headers)
 {
 	assert(headers);
-	assert(headers_string);
+	assert(extra_headers);
 	char buf[1024];
 	MMSError error;
 	MMSHEADER h;
 
-	const size_t end = strlen(headers_string);
+	const size_t end = strlen(extra_headers);
 	size_t begin = 0;
-	ssize_t eol = MMS_NextToken(headers_string, end, 0, '\n');
+	ssize_t eol = MMS_NextToken(extra_headers, end, 0, '\n');
 	while(eol > 0) {
-		ssize_t split = MMS_NextToken(headers_string, eol, begin, '=');
+		ssize_t split = MMS_NextToken(extra_headers, eol, begin, '=');
 		if(split > 0) {
 			size_t len = split - begin - 1;
-			memcpy(buf, &headers_string[begin], len);
+			memcpy(buf, &extra_headers[begin], len);
 			buf[len] = 0;
 			MMSFIELDINFO fi = MMSFields_FindByName(buf);
 			if(!fi)
@@ -285,7 +262,7 @@ MMSError MMS_ParseHeaders(MMSHEADERS headers, CSTR headers_string)
 
 			memset(buf, 0xff, sizeof(buf));
 			len = eol - split - 1;
-			memcpy(buf, &headers_string[split], len);
+			memcpy(buf, &extra_headers[split], len);
 			buf[len] = 0;
 
 			error = MMSValue_SetFromString(&h->value, fi, buf);
@@ -294,7 +271,99 @@ MMSError MMS_ParseHeaders(MMSHEADERS headers, CSTR headers_string)
 		}
 
 		begin = eol;
-		eol = MMS_NextToken(headers_string, end, eol, '\n');
+		eol = MMS_NextToken(extra_headers, end, eol, '\n');
+	}
+
+	return MMS_ERR_NONE;
+}
+
+MMSError MMS_ParseMediaType(CSTR mime, MMSCONTENTTYPE out)
+{
+	assert(mime);
+	assert(out);
+
+	MMSError e;
+	const size_t end = strlen(mime);
+	ssize_t pos = strchr(mime, ' ') - mime + 1;
+	if(pos < 0)
+		pos = end;
+
+	MMSVALUEENUM wk = MMS_WkContentType_FindByName(mime);
+	if(!wk)
+		return MMS_ERR_UNKNOWN_MIME;
+
+	// TODO: support extension media
+
+
+	out->vt = VT_WK_MEDIA;
+	out->v.wk_media = wk;
+
+	if((size_t)pos == end)
+		return MMS_ERR_NONE;
+
+	MMSPARAMETERS params = &out->params;
+	params->entries = malloc(MMS_MAX_PARAMS * sizeof(MMSParameter));
+	if(!params->entries)
+		return MMS_ERR_MEMORY;
+
+	memset(params->entries, 0, MMS_MAX_PARAMS * sizeof(MMSParameter));
+	params->count = 0;
+
+	ssize_t next = MMS_NextToken(mime, end, pos, ',');
+
+	while(next > 0) {
+		MMSPARAMETER p = &params->entries[params->count];
+		e = MMS_ParseParameter(p, &mime[pos], next);
+		if(e != MMS_ERR_NONE)
+			return e;
+
+		params->count++;
+		next = MMS_NextToken(mime, end, pos, ',');
+	}
+
+	MMSPARAMETER p = &params->entries[params->count];
+	e = MMS_ParseParameter(p, &mime[pos], end);
+	if(e != MMS_ERR_NONE)
+		return e;
+
+	params->count++;
+
+	return MMS_ERR_NONE;
+}
+
+MMSError MMS_ParseParameter(MMSPARAMETER p, CSTR param, ssize_t end)
+{
+	assert(p);
+	assert(param);
+	char buf[1024];
+
+	ssize_t split = MMS_NextToken(param, end, 0, '=');
+	if(split == -1)
+		return MMS_ERR_INVALID_PARAM;
+
+	memcpy(buf, param, split - 1);
+	buf[split] = 0;
+	MMSFIELDINFO fi = MMS_WkParam_FindByName(buf);
+	if(!fi) // TODO: support untyped parameters
+		return MMS_ERR_INVALID_PARAM;
+
+	p->kind = MMS_PARAM_TYPED;
+	memcpy(buf, param + split, end);
+	buf[end+1] = 0;
+
+	switch(fi->vt) {
+		default:
+			return MMS_ERR_UNSUPPORTED;
+		case VT_WK_CHARSET: {
+			MMSVALUEENUM ch = MMS_Charset_FindByName(buf);
+			if(!ch)
+				return MMS_ERR_UNSUPPORTED;
+
+			p->v.typed.type = fi;
+			p->v.typed.value.type = VT_WK_CHARSET;
+			p->v.typed.value.v.enum_v = ch;
+		}
+		break;
 	}
 
 	return MMS_ERR_NONE;

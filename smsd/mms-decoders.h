@@ -31,6 +31,7 @@ MMSError MMS_DecodeContentGeneralForm(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeContentType(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeYesNo(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodePriority(SBUFFER stream, MMSVALUE out);
+MMSError MMS_DecodeStatusValue(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeMessageClass(SBUFFER stream, MMSVALUE out);
 MMSError MMS_DecodeMessageType(SBUFFER stream, MMSVALUE out);
 

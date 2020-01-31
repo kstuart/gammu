@@ -15,7 +15,7 @@ typedef struct _MMSConveyor {
 } MMSConveyor;
 typedef MMSConveyor *MMSCONVEYOR;
 
-LocalTXID CreateTransactionID(void);
+LocalTXID MMS_CreateTransactionID(void);
 int MMS_MapEncodedHeaders(SBUFFER stream, MMSHEADERS headers);
 MMSError MMS_MapEncodedParts(SBUFFER stream, MMSPARTS parts);
 MMSError MMS_MapEncodedMessage(GSM_SMSDConfig *Config, SBUFFER Stream, MMSMESSAGE *out);
@@ -26,6 +26,7 @@ void SaveSBufferToTempFile(GSM_SMSDConfig *Config, SBUFFER Buffer);
 void MMS_ContentTypeAsString(SBUFFER buffer, MMSContentType *ct);
 
 MMSError MMS_ParseMediaType(CSTR mime, MMSCONTENTTYPE out);
-MMSError MMS_ParseHeaders(MMSHEADERS headers, CSTR headers_string);
+MMSError MMS_ParseParameter(MMSPARAMETER p, CSTR param, ssize_t end);
+MMSError MMS_ParseHeaders(MMSHEADERS headers, CSTR extra_headers);
 
 #endif //GAMMU_MMS_SERVICE_H

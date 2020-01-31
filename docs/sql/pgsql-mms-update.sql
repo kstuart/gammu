@@ -19,3 +19,6 @@ create table outbox_mms_parts
     "Data" bytea,
     "End" integer
 );
+
+-- For Sent MMS, UDH is used to store MMS MessageID for report matching
+create unique index sentitems_UDH_uindex on sentitems ("UDH");

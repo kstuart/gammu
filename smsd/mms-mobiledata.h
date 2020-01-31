@@ -5,7 +5,7 @@
 #include "gammu-smsd.h"
 
 typedef struct _StreamBuffer *SBUFFER;
-extern struct _MMSConveyor *MMSMobileDataConveyor;
+extern struct _MMSConveyor MMSMobileDataConveyor;
 
 GSM_Error MobileDataStart(GSM_SMSDConfig *Config);
 GSM_Error MobileDataStop(GSM_SMSDConfig *Config);
