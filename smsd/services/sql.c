@@ -844,14 +844,12 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 	Config->db->FreeResult(Config, &result);
 	if(error != ERR_NONE) {
 		SB_Destroy(&buf);
-		MMSMessage_Destroy(&mms);
 		return error;
 	}
 
 	error = SaveMMSParts(Config, inbox_id, mms, buf);
 
 	SB_Destroy(&buf);
-	MMSMessage_Destroy(&mms);
 	SB_Clear(Config->MMSBuffer);
 
 	return error;
