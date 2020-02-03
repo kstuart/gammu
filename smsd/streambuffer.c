@@ -4,6 +4,7 @@
 #include <gammu-smsd.h>
 #include <gammu-unicode.h>
 #include <stdint.h>
+#include <fcntl.h>
 
 #include "streambuffer.h"
 #include "../libgammu/misc/coding/coding.h"
@@ -429,4 +430,28 @@ int SB_Truncate(SBUFFER buffer, size_t count)
 
 	buffer->end -= count;
 	return 0;
+}
+
+ssize_t SB_SaveToOpenFile(SBUFFER buffer, int fd)
+{
+	if(fd == -1)
+		return -1;
+
+	ssize_t written = write(fd, SBBase(buffer), SBUsed(buffer));
+	close(fd);
+
+	if(written != (ssize_t)SBUsed(buffer))
+		return -1;
+
+	return written;
+}
+
+
+ssize_t SB_SaveToFile(SBUFFER buffer, const char *filename)
+{
+	int fd = open(filename, O_WRONLY | O_CREAT, 0644);
+	if(fd == -1)
+		return -1;
+
+	return SB_SaveToOpenFile(buffer, fd);
 }

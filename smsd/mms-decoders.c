@@ -128,7 +128,6 @@ MMSError MMS_DecodeExpiry(SBUFFER stream, MMSVALUE out)
 	return MMS_ERR_NONE;
 }
 
-
 MMSVALUEENUM DecodeWellKnownCharset(SBUFFER stream)
 {
 	if(SB_PeekByte(stream) == CHARSET_ANY) {
@@ -322,6 +321,12 @@ MMSError MMS_DecodeMessageType(SBUFFER stream, MMSVALUE out)
 {
 	return _EncodedQuickFindByID(stream, VT_MESSAGE_TYPE, out, MMS_MessageType_FindByID);
 }
+
+MMSError MMS_DecodeResponseStatus(SBUFFER stream, MMSVALUE out)
+{
+	return _EncodedQuickFindByID(stream, VT_RESPONSE_STATUS, out, MMS_ResponseStatus_FindByID);
+}
+
 
 MMSError MMS_DecodeWellKnownCharset(SBUFFER stream, MMSVALUE out)
 {
@@ -594,6 +599,10 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSVALUE out)
 			break;
 		case VT_EXPIRY:
 			MMS_DecodeExpiry(stream, out);
+			break;
+		case VT_RESPONSE_STATUS:
+			MMS_DecodeResponseStatus(stream, out);
+			break;
 	}
 
 	return MMS_ERR_NONE;

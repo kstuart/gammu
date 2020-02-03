@@ -104,6 +104,7 @@ MMSVALUEENUM MMS_MessageClass_FindByID(int id);
 MMSVALUEENUM MMS_Priority_FindByID(int id);
 MMSVALUEENUM MMS_YesNo_FindByID(int id);
 MMSVALUEENUM MMS_StatusValue_FindByID(int id);
+MMSVALUEENUM MMS_ResponseStatus_FindByID(int id);
 
 MMSFIELDINFO WSPFields_FindByName(const char *name);
 MMSFIELDINFO MMSFields_FindByName(const char *name);
@@ -115,6 +116,7 @@ MMSVALUEENUM MMS_MessageClass_FindByName(const char *name);
 MMSVALUEENUM MMS_Priority_FindByName(const char *name);
 MMSVALUEENUM MMS_YesNo_FindByName(const char *name);
 MMSVALUEENUM MMS_StatusValue_FindByName(const char *name);
+MMSVALUEENUM MMS_ResponseStatus_FindByName(const char *name);
 
 
 #endif //GAMMU_MMS_TABLES_H

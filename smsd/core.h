@@ -26,6 +26,7 @@
 
 #define MMS_MESSAGE_TO_SEND (ERR_LAST_VALUE + 1)
 typedef struct _StreamBuffer *SBUFFER;
+GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer);
 
 typedef enum {
 	SMSD_LOG_NONE,

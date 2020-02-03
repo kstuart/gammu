@@ -6,6 +6,8 @@
 #include "streambuffer.h"
 #include "mms-service.h"
 
+#include "mms-mobiledata.h"
+
 gboolean SMSD_RunOn(const char*, GSM_MultiSMSMessage*, GSM_SMSDConfig*, const char*, const char*);
 
 GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
@@ -118,11 +120,11 @@ static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const c
 	return cr == CURLE_OK ? ERR_NONE : ERR_ABORTED;
 }
 
-static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const char *URL)
+static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER RespBuffer, const char *URL)
 {
 	CURL *ch;
 	CURLcode cr;
-	SBUFFER RespBuffer = SB_Init();
+	GSM_Error error;
 
 	if(!RespBuffer) {
 		SMSD_LogErrno(Config, "Failed to create response buffer");
@@ -155,15 +157,14 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const ch
 	}
 	cr = curl_easy_perform(ch);
 
+
 	if(cr != CURLE_OK)
 		SMSD_Log(DEBUG_ERROR, Config, "Failed to post MMS to server: %s", curl_easy_strerror(cr));
 
 	/* cleanup curl stuff */
 	curl_easy_cleanup(ch);
 
-	// TODO: process response
-
-	return cr == CURLE_OK ? ERR_NONE : ERR_ABORTED;
+	return cr == CURLE_OK && error == ERR_NONE ? ERR_NONE : ERR_ABORTED;
 }
 
 GSM_Error FetchMMS(GSM_SMSDConfig *Config, SBUFFER Buffer, GSM_MMSIndicator *MMSIndicator)
@@ -191,6 +192,7 @@ GSM_Error SendMMS(GSM_SMSDConfig *Config, SBUFFER Buffer)
 {
 	assert(Config);
 	assert(Buffer);
+	SBUFFER RespBuffer = SB_Init();
 
 	GSM_Error error = MobileDataStart(Config);
 	if(error != ERR_NONE) {
@@ -198,11 +200,15 @@ GSM_Error SendMMS(GSM_SMSDConfig *Config, SBUFFER Buffer)
 		return error;
 	}
 
-	error = CURL_PostToURL(Config, Buffer, Config->MMSCAddress);
+	error = CURL_PostToURL(Config, Buffer, RespBuffer, Config->MMSCAddress);
 
 	if(MobileDataStop(Config) != ERR_NONE)
 		SMSD_Log(DEBUG_ERROR, Config, "Failed to disconnect APN network.");
 
+	if(SBUsed(RespBuffer))
+		SMSD_ProcessServerResponse(Config, RespBuffer);
+
+	SB_Destroy(&RespBuffer);
 	return error;
 }
 

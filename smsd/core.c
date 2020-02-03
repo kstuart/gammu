@@ -1429,6 +1429,42 @@ GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config, SBUFFER MMSBuffer)
 	return error;
 }
 
+GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
+{
+	assert(RespBuffer);
+	MMSError error;
+	GSM_Error gerr = ERR_NONE;
+	char fname[] = "/tmp/GSvrResp_XXXXXX";
+
+	int fd = mkstemp(fname);
+	if(fd != -1)
+		SB_SaveToOpenFile(RespBuffer, fd);
+
+	close(fd);
+	SMSD_Log(DEBUG_NOTICE, Config, "Saved server response to '%s'", fname);
+
+	MMSMESSAGE m = NULL;
+	error = MMS_MapEncodedMessage(Config, RespBuffer, &m);
+	if(error != MMS_ERR_NONE) {
+		MMSMessage_Destroy(&m);
+	}
+
+	SBUFFER out = SB_Init();
+	MMS_DumpHeaders(out, m->Headers);
+	SB_PutByte(out, 0);
+	SMSD_Log(DEBUG_NOTICE, Config, "Server Response:\n%s", SBBase(out));
+
+	MMSHEADER h = MMSMessage_FindHeader(m, MMS_HEADER, MMS_RESPONSE_STATUS);
+	if(!h) {
+		SMSD_Log(DEBUG_INFO, Config, "Got server response without status field.");
+	}
+
+
+	SB_Destroy(&out);
+	MMSMessage_Destroy(&m);
+	return ERR_NONE;
+}
+
 GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
 {
 	MMSMESSAGE mms = NULL;

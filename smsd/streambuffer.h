@@ -56,5 +56,7 @@ unsigned char SB_NextByte(SBUFFER buffer);
 
 int SB_Truncate(SBUFFER buffer, size_t count);
 ssize_t SB_Read(SBUFFER buffer, int fd, size_t size);
+ssize_t SB_SaveToOpenFile(SBUFFER buffer, int fd);
+ssize_t SB_SaveToFile(SBUFFER buffer, const char *filename);
 
 #endif //GAMMU_STREAMBUFFER_H

@@ -426,3 +426,27 @@ MMSVALUEENUM MMS_StatusValue_FindByID(int id)
 {
 	return _EncodedEnumQuickLookup(MMSStatusValueEnum, MMSStatusValueEnumSize, id);
 }
+
+MMSValueEnum MMSResponseStatusEnum[] = {
+	{ "Ok" , 128 },
+	{ "Error-unspecified" , 129 },
+	{ "Error- service-denied" , 130 },
+	{ "Error-message-format-corrupt", 131 },
+	{ "Error-sending-address-unresolved" , 132 },
+	{ "Error-message-not-found" , 133 },
+	{ "Error-network-problem" , 134 },
+	{ "Error- content-not-accepted" , 135 },
+	{ "Error-unsupported-message" , 136 },
+};
+size_t MMSResponseStatusEnumSize = sizeof(MMSResponseStatusEnum) / sizeof(MMSResponseStatusEnum[0]);
+
+MMSVALUEENUM MMS_ResponseStatus_FindByName(const char *name)
+{
+	assert(name);
+	return _EnumLookupByName(MMSResponseStatusEnum, MMSResponseStatusEnumSize, name);
+}
+
+MMSVALUEENUM MMS_ResponseStatus_FindByID(int id)
+{
+	return _EncodedEnumQuickLookup(MMSResponseStatusEnum, MMSResponseStatusEnumSize, id);
+}
