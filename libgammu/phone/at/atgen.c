@@ -1479,6 +1479,19 @@ GSM_Error ATGEN_DispatchMessage(GSM_StateMachine *s)
 	/* Find number of lines */
 	i = ATGEN_PrintReplyLines(s);
 
+	j = 1;
+	while(j != i) {
+		line1 = strdup(GetLineString(msg->Buffer, &Priv->Lines, j));
+		if(strncmp(line1, "#MMS", 4) == 0) {
+			memmove(Priv->Lines.numbers, Priv->Lines.numbers + j, (Priv->Lines.allocated - 1) * sizeof(int));
+			i--;
+		}
+		else {
+			j++;
+		}
+		free(line1);
+	}
+
 	/* Check for duplicated command in response (bug#1069) */
 	if (i >= 2) {
 		/* Get first two lines */
@@ -1504,6 +1517,8 @@ GSM_Error ATGEN_DispatchMessage(GSM_StateMachine *s)
 		free(line1);
 		free(line2);
 	}
+
+
 
 	Priv->ReplyState 	= AT_Reply_Unknown;
 	Priv->ErrorText     	= NULL;
