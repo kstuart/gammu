@@ -199,7 +199,7 @@ MMSError MMSValue_CopyStr(MMSVALUE v, MMSValueType t, CSTR str)
 	assert(str);
 	MMSValue_Clear(v);
 
-	v->v.str = malloc(strlen(str));
+	v->v.str = malloc(strlen(str) + 1);
 	if(!v->v.str)
 		return MMS_ERR_MEMORY;
 
@@ -436,7 +436,9 @@ MMSHEADER MMSHeaders_NewHeader(MMSHEADERS headers)
 	if(headers->end >= headers->capacity)
 		return NULL;
 
-	return &headers->entries[headers->end++];
+	MMSHEADER h = &headers->entries[headers->end++];
+	memset(h, 0, sizeof(MMSHeader));
+	return h;
 }
 
 MMSHEADER MMSHeaders_FindByID(MMSHEADERS h, MMSFieldKind kind, int field_id)
@@ -585,7 +587,7 @@ MMSError MMSMessage_SetID(MMSMESSAGE message, CSTR id)
 	if(message->id)
 		free(message->id);
 
-	message->id = malloc(strlen(id));
+	message->id = malloc(strlen(id) + 1);
 	if(!message->id)
 		return MMS_ERR_MEMORY;
 

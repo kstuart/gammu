@@ -1784,13 +1784,6 @@ GSM_Error SMSD_SendSMS(GSM_SMSDConfig *Config)
 		assert(sms.Number == 1);
 		error = SMSD_SendMMS(Config, Config->MMSBuffer);
 
-		memcpy(sms.SMS[0].UDH.Text, &Config->MMSSendID.mmsTxID, sizeof(LocalTXID));
-		sms.SMS[0].UDH.Length = sizeof(LocalTXID);
-		sms.SMS[0].UDH.Type = UDH_UserUDH;
-
-		Config->MMSSendID.outboxID = -1;
-		Config->MMSSendID.mmsTxID = -1;
-
 		if(error != ERR_NONE) {
 			SMSD_Log(DEBUG_INFO, Config, "Error sending MMS (%s)", Config->SMSID);
 			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_ERROR, -1);

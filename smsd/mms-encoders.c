@@ -272,10 +272,14 @@ MMSError MMS_EncodeTypedParameter(SBUFFER stream, TYPEDPARAM param)
 	assert(param);
 
 	MMS_EncodeInteger(stream, param->type->code);
-	if(param->type->vt == VT_TEXT)
-		MMS_EncodeText(stream, param->value.v.str);
-	else
-		MMS_EncodeInteger(stream, param->value.v.long_int);
+	switch(param->value.type) {
+		default:
+			printf("No encoder for typed parameter: %s\n", param->type->name);
+		case VT_WK_CHARSET:
+		case VT_ENUM:
+			MMS_EncodeInteger(stream, param->value.v.enum_v->code);
+			break;
+	}
 
 	return MMS_ERR_NONE;
 }
@@ -464,7 +468,6 @@ MMSError MMS_EncodePart(SBUFFER stream, MMSPART part)
 	if(ct.id.info->vt == VT_NONE)
 		return MMS_ERR_REQUIRED_FIELD;
 
-	MMSHeaders_Remove(part->headers, &ct);
 
 	SBUFFER b = SB_InitWithCapacity(part->data_len);
 	error = MMS_EncodeContentType(b, &ct.value);
@@ -472,6 +475,8 @@ MMSError MMS_EncodePart(SBUFFER stream, MMSPART part)
 		SB_Destroy(&b);
 		return error;
 	}
+
+	MMSHeaders_Remove(part->headers, &ct);
 
 	error = MMS_EncodeHeaders(b, part->headers);
 	if(error != MMS_ERR_NONE) {

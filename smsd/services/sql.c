@@ -39,7 +39,6 @@
 #include "../../libgammu/gsmstate.h"
 #include "../mms-data.h"
 
-#define MMS_MARKER ("5f5f4d4d535f5f0a")
 GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator);
 
 /**
@@ -789,13 +788,11 @@ GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 		return ERR_INVALIDDATA;
 	}
 
-
-	SB_PutFormattedString(buf, "select \"ID\", \"TextDecoded\" from sentitems where \"UDH\" = '%s';", txid);
+	SB_PutFormattedString(buf, "select \"ID\", \"MMSReports\" from sentitems where \"MMS_ID\" = '%s';", txid);
 	SB_PutByte(buf, 0);
 
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
 	if(error != ERR_NONE) {
-		Config->db->FreeResult(Config, &result);
 		SB_Destroy(&buf);
 		return error;
 	}
@@ -808,11 +805,10 @@ GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 	}
 
 	CSTR sent_id = Config->db->GetString(Config, &result, 0);
-	CSTR text_decoded = Config->db->GetString(Config, &result, 1);
-	Config->db->FreeResult(Config, &result);
+	CSTR reports = Config->db->GetString(Config, &result, 1);
 
 	SB_Clear(buf);
-	SB_PutFormattedString(buf, "update sentitems set \"Status\" = 'SendingOK', \"TextDecoded\" = '%sTo ", text_decoded);
+	SB_PutFormattedString(buf, "update sentitems set \"Status\" = 'SendingOK', \"MMSReports\" = '%sTo ", reports);
 	MMSValue_AsString(buf, &To->value);
 	SB_PutString(buf, " on ");
 	MMSValue_AsString(buf, &Date->value);
@@ -820,6 +816,7 @@ GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 	MMSValue_AsString(buf, &Status->value);
 	SB_PutString(buf, "\n");
 	SB_PutFormattedString(buf, "' where \"ID\" = '%s';", sent_id);
+	Config->db->FreeResult(Config, &result);
 
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
 	if(error != ERR_NONE)
@@ -827,7 +824,6 @@ GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 
 	Config->db->FreeResult(Config, &result);
 	SB_Destroy(&buf);
-
 	return error;
 }
 
@@ -836,19 +832,18 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 	GSM_Error error;
 	SQL_result result;
 	SBUFFER buf = SB_InitWithCapacity(20480);
-	SB_PutString(buf, "update inbox set \"TextDecoded\" = '");
+	SB_PutString(buf, "update inbox set \"MMSHeaders\" = '");
 	MMS_DumpHeaders(buf, mms->Headers);
 	SB_PutFormattedString(buf, "' where \"ID\" = %d;", inbox_id);
 	SB_PutByte(buf, 0);
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
-	Config->db->FreeResult(Config, &result);
 	if(error != ERR_NONE) {
 		SB_Destroy(&buf);
-		return error;
+        return error;
 	}
+	Config->db->FreeResult(Config, &result);
 
 	error = SaveMMSParts(Config, inbox_id, mms, buf);
-
 	SB_Destroy(&buf);
 	SB_Clear(Config->MMSBuffer);
 
@@ -1288,7 +1283,8 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			text_len = strlen(text);
 		}
 		udh = db->GetString(Config, &res, 2);
-		sms->SMS[sms->Number].Class = (char)db->GetNumber(Config, &res, 3);
+		int Class = (char)db->GetNumber(Config, &res, 3);
+		sms->SMS[sms->Number].Class = Class;
 		text_decoded = db->GetString(Config, &res, 4);
 		if (udh == NULL) {
 			udh_len = 0;
@@ -1354,7 +1350,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 		}
 
 
-		if(i == 1 && strcmp(udh, MMS_MARKER) == 0) {
+		if(i == 1 &&  Class == GSM_CLASS_MMS) {
 			error = SMSDSQL_PrepareOutboxMMS(Config, outbox_id, destination, text_decoded, Config->MMSBuffer);
 			if(error != ERR_NONE && error != ERR_EMPTY) {
 				db->FreeResult(Config, &res);
@@ -1484,7 +1480,7 @@ static GSM_Error SMSDSQL_CreateOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConf
 
 static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *ID, int Part, GSM_SMSDSendingError err, int TPMR)
 {
-	SQL_result res;
+	SQL_result res, r2;
 	struct GSM_SMSDdbobj *db = Config->db;
 	GSM_Error error;
 	size_t query_type;
@@ -1542,14 +1538,34 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	vars[5].type = SQL_TYPE_INT;
 	vars[5].v.i = (int)db->GetNumber(Config, &res, Part == 1 ? 13 : 8);
 	vars[6].type = SQL_TYPE_NONE;
-	db->FreeResult(Config, &res);
 
-	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_ADD_SENT_INFO], &sms->SMS[Part - 1], NULL, vars, &res, FALSE);
+	int Class = (char)db->GetNumber(Config, &res, 3);
+	CSTR MMSHeaders = db->GetString(Config, &res, 14);
+
+	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_ADD_SENT_INFO], &sms->SMS[Part - 1], NULL, vars, &r2, FALSE);
 	if (error != ERR_NONE) {
 		SMSD_Log(DEBUG_INFO, Config, "Error writing to database (%s)", __FUNCTION__);
 		return error;
 	}
-	db->FreeResult(Config, &res);
+	db->FreeResult(Config, &r2);
+
+	if(Part == 1 && Class == GSM_CLASS_MMS) {
+		SBUFFER buf = SB_Init();
+		SB_PutString(buf, "update sentitems set \"MMS_ID\" = '");
+		SB_PutAsBinHex(buf, &Config->MMSSendID.mmsTxID, sizeof(Config->MMSSendID.mmsTxID));
+		SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s' where \"ID\" = %lld;", MMSHeaders, Config->MMSSendID.outboxID);
+		error = SMSDSQL_Query(Config, SBBase(buf), &r2);
+		SB_Destroy(&buf);
+		if (error != ERR_NONE) {
+			SMSD_Log(DEBUG_INFO, Config, "Error writing to database (%s)", __FUNCTION__);
+			return error;
+		}
+		Config->db->FreeResult(Config, &r2);
+		Config->db->FreeResult(Config, &res);
+
+		Config->MMSSendID.outboxID = -1;
+		Config->MMSSendID.mmsTxID = -1;
+	}
 
 	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_UPDATE_SENT], &sms->SMS[Part - 1], NULL, NULL, &res, FALSE);
 	if (error != ERR_NONE) {
@@ -1893,6 +1909,7 @@ GSM_Error SMSDSQL_ReadConfiguration(GSM_SMSDConfig *Config)
 			", ", ESCAPE_FIELD("Retries"),
 			", ", ESCAPE_FIELD("Status"),
 			", ", ESCAPE_FIELD("StatusCode"),
+			", ", ESCAPE_FIELD("MMSHeaders"),
 			" FROM ", Config->table_outbox, " WHERE ",
 			ESCAPE_FIELD("ID"), "=%1", NULL) != ERR_NONE) {
 		return ERR_UNKNOWN;

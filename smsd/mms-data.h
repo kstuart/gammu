@@ -214,6 +214,7 @@ typedef struct _UntypedParam {
 typedef UntypedParam *UNTYPEDPARAM;
 
 typedef enum _MMSParameterKind {
+	MMS_PARAM_UNSET,
 	MMS_PARAM_TYPED,
 	MMS_PARAM_UNTYPED,
 } MMSParameterKind;

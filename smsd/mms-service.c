@@ -194,7 +194,7 @@ void MMS_ContentTypeAsString(SBUFFER buffer, MMSContentType *ct)
 			break;
 	}
 
-	// Note: Avoid parameters that may cause SQL insert to fail until sanitization implemented
+	// Note: Avoid parameters that may cause SQL insert to fail until sanitization/escaping implemented
 	// TODO: Add untyped parameters
 	if(ct->params.count) {
 		MMSPARAMETERS params = &ct->params;
@@ -207,6 +207,7 @@ void MMS_ContentTypeAsString(SBUFFER buffer, MMSContentType *ct)
 				SB_PutString(buffer, ", ");
 			}
 		}
+		SB_Truncate(buffer, 2);
 	}
 }
 
@@ -294,7 +295,6 @@ MMSError MMS_ParseMediaType(CSTR mime, MMSCONTENTTYPE out)
 
 	// TODO: support extension media
 
-
 	out->vt = VT_WK_MEDIA;
 	out->v.wk_media = wk;
 
@@ -302,12 +302,14 @@ MMSError MMS_ParseMediaType(CSTR mime, MMSCONTENTTYPE out)
 		return MMS_ERR_NONE;
 
 	MMSPARAMETERS params = &out->params;
-	params->entries = malloc(MMS_MAX_PARAMS * sizeof(MMSParameter));
-	if(!params->entries)
-		return MMS_ERR_MEMORY;
+	if(!params->entries) {
+		params->entries = malloc(MMS_MAX_PARAMS * sizeof(MMSParameter));
+		if (!params->entries)
+			return MMS_ERR_MEMORY;
 
-	memset(params->entries, 0, MMS_MAX_PARAMS * sizeof(MMSParameter));
-	params->count = 0;
+		memset(params->entries, 0, MMS_MAX_PARAMS * sizeof(MMSParameter));
+		params->count = 0;
+	}
 
 	ssize_t next = MMS_NextToken(mime, end, pos, ',');
 
@@ -349,7 +351,7 @@ MMSError MMS_ParseParameter(MMSPARAMETER p, CSTR param, ssize_t end)
 
 	p->kind = MMS_PARAM_TYPED;
 	memcpy(buf, param + split, end);
-	buf[end+1] = 0;
+	buf[end + 1] = 0;
 
 	switch(fi->vt) {
 		default:

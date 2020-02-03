@@ -130,6 +130,10 @@ endif(CMAKE_COMPILER_IS_MINGW AND BUILD_SHARED_LIBS)
 
 target_link_libraries (gsmsd libGammu)
 
+# mms-dump program
+add_executable(mms-dump mms-dump.c)
+target_link_libraries (mms-dump gsmsd)
+
 # Gammu-smsd program
 add_executable (gammu-smsd ${DAEMON_SRC} ${SMSD_RESOURCES})
 add_coverage (gammu-smsd)

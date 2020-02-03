@@ -227,7 +227,6 @@ MMSError MMS_DecodeFromAddress(SBUFFER stream, MMSVALUE out)
 	if(e != MMS_ERR_NONE)
 		return e;
 
-	out->type = VT_FROM;
 	return MMS_ERR_NONE;
 }
 
@@ -560,23 +559,14 @@ MMSError MMS_DecodeFieldValue(SBUFFER stream, MMSFIELDINFO fi, MMSVALUE out)
 		case VT_DATE:
 			MMS_DecodeDate(stream, out);
 			break;
+		case VT_ADDRESS:
+			MMS_DecodeAddress(stream, out);
+			break;
 		case VT_FROM:
 			MMS_DecodeFromAddress(stream, out);
 			break;
 		case VT_ENCODED_STRING:
 			MMS_DecodeEncodedText(stream, out);
-			switch(fi->code) {
-				default:
-					break;
-				case MMS_FROM:
-					out->type = VT_FROM;
-					break;
-				case MMS_TO:
-				case MMS_BCC:
-				case MMS_CC:
-					out->type = VT_ADDRESS;
-					break;
-			}
 			break;
 		case VT_MESSAGE_CLASS:
 			MMS_DecodeMessageClass(stream, out);

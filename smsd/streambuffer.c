@@ -200,7 +200,7 @@ ssize_t SB_ResizeIfNeeded(SBUFFER buffer, size_t offset, size_t count)
 
 	ssize_t needed = count + offset;
 	if((ssize_t)buffer->capacity < needed)
-		return SB_Grow(buffer, needed - buffer->capacity);
+		return SB_Grow(buffer, needed - buffer->capacity + 1);
 
 	return buffer->capacity;
 }

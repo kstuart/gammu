@@ -444,7 +444,8 @@ typedef enum {
 	GSM_SMS_None = -1,
 	GSM_SMS_Flash,
 	GSM_SMS_Normal,
-	GSM_SMS_USSD = 127
+	GSM_CLASS_MMS = 100,
+	GSM_SMS_USSD = 127,
 } GSM_SMS_Class;
 
 /**

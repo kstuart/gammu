@@ -6,7 +6,7 @@
 static MMSFIELDINFO _FieldInfoLookupByName(MMSFIELDINFO tbl, int count, const char *name)
 {
 	for(int i = 0; i < count; i++)
-		if(strcasecmp(tbl[i].name, name) == 0)
+		if(strncasecmp(tbl[i].name, name, strlen(tbl[i].name)) == 0)
 			return &tbl[i];
 
 	return NULL;
