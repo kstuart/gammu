@@ -1103,7 +1103,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 
 	SB_PutFormattedString(buf,
 	                      "select \"MediaType\", \"DataLength\", \"Data\", \"End\" "
-											 "from outbox_mms_parts where \"OUTBOX_ID\" = %ld;", outbox_id);
+											 "from outbox_mms_parts where \"OUTBOX_ID\" = %ld  order by \"ID\";", outbox_id);
 
 	MMSMESSAGE m = MMSMessage_Init();
 	if(!m) {
