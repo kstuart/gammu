@@ -145,6 +145,7 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER 
 	curl_easy_setopt(ch, CURLOPT_POST, 1L);
 	curl_easy_setopt(ch, CURLOPT_READFUNCTION, SendBufferCallback);
 	curl_easy_setopt(ch, CURLOPT_READDATA, (void*)Buffer);
+	curl_easy_setopt(ch, CURLOPT_POSTFIELDSIZE, (long)SBUsed(Buffer));
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, ReceiveBufferCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)RespBuffer);
 	if(Config->MMSCProxy) {

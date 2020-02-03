@@ -1443,10 +1443,15 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 	close(fd);
 	SMSD_Log(DEBUG_NOTICE, Config, "Saved server response to '%s'", fname);
 
+	if(SB_PeekByte(RespBuffer) != 0x8c) {
+		SMSD_Log(DEBUG_NOTICE, Config, "Server Response: %s", SBBase(RespBuffer));
+	}
+
 	MMSMESSAGE m = NULL;
 	error = MMS_MapEncodedMessage(Config, RespBuffer, &m);
 	if(error != MMS_ERR_NONE) {
 		MMSMessage_Destroy(&m);
+		return ERR_NONE;
 	}
 
 	SBUFFER out = SB_Init();
