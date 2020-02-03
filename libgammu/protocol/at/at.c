@@ -148,6 +148,7 @@ GSM_Error AT_StateMachine(GSM_StateMachine *s, unsigned char rx_char)
 
 		/* Telit */
 		{"#STN:"	,1, ID_All}, /* #STN: 150,1,"" */
+		{"#MMSSEND:"	,1, ID_All},
 
 		{NULL		,1, ID_All}};
 
