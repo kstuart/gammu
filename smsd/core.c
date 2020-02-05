@@ -1560,10 +1560,12 @@ gboolean SMSD_CheckMultipart(GSM_SMSDConfig *Config, GSM_MultiSMSMessage *MultiS
 
 	/* Have we seen this message recently? */
 	if (same_id) {
+		MultiSMS->SMS[0].Timeout = FALSE;
 		if (Config->IncompleteMessageTime != 0 && difftime(time(NULL), Config->IncompleteMessageTime) >= Config->multiparttimeout) {
 			SMSD_Log(DEBUG_INFO, Config, "Incomplete multipart message 0x%02X, processing after timeout",
 				Config->IncompleteMessageID);
 			Config->IncompleteMessageID = -1;
+			MultiSMS->SMS[0].Timeout = TRUE;
 		} else {
 			SMSD_Log(DEBUG_INFO, Config, "Incomplete multipart message 0x%02X, waiting for other parts (waited %.0f seconds)",
 				Config->IncompleteMessageID,

@@ -1492,7 +1492,10 @@ gboolean GSM_DecodeMultiPartSMS(GSM_Debug_Info *di,
 	}
 	/* MMS indication */
 	if (SMS->SMS[0].UDH.Type == UDH_MMSIndicatorLong) {
-		return GSM_DecodeMMSIndication(di, Info, SMS);
+		if(SMS->SMS[0].Timeout == FALSE)
+			return GSM_DecodeMMSIndication(di, Info, SMS);
+		else
+			smfprintf(di, "Timeout waiting for multipart MMS Indicator\n");
 	}
 
 	return FALSE;

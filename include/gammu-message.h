@@ -543,6 +543,11 @@ typedef struct {
 	 * Message reference.
 	 */
 	unsigned char MessageReference;
+	/**
+	 * Timeout waiting for all parts of multi-part message.
+	 */
+	 gboolean Timeout;
+
 } GSM_SMSMessage;
 
 /* In layouts are saved locations for some SMS part. Below are listed
