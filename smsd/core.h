@@ -94,6 +94,7 @@ struct _GSM_SMSDConfig {
 	const char *RunOnDataConnect; /* run this command to start/stop mobile data connection (PPP) */
 	const char *MMSCAddress; /* MMS Service Provider (MMSC) http address */
 	const char *MMSCProxy; /* MMS Service Provider Proxy URL */
+  gboolean MMSAutoDownload; /* TRUE to download MMS messages */
 	gboolean checksecurity;
 	gboolean hangupcalls;
 	gboolean checkbattery;

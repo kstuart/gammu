@@ -1,6 +1,8 @@
 /* Copyright (c) 2002-2004 by Marcin Wiacek and Joergen Thomsen */
 /* Copyright (c) 2009 - 2018 Michal Cihar <michal@cihar.com> */
 
+#include "gammu-error.h"
+#include "gammu-inifile.h"
 #include <string.h>
 #include <signal.h>
 #include <time.h>
@@ -420,6 +422,7 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 	Config->RunOnDataConnect = NULL;
 	Config->MMSCAddress = NULL;
 	Config->MMSCProxy = NULL;
+	Config->MMSAutoDownload = FALSE;
 	Config->smsdcfgfile = NULL;
 	Config->log_handle = NULL;
 	Config->log_type = SMSD_LOG_NONE;
@@ -899,6 +902,7 @@ GSM_Error SMSD_ReadConfig(const char *filename, GSM_SMSDConfig *Config, gboolean
 	Config->RunOnDataConnect = INI_GetValue(Config->smsdcfgfile, "smsd", "runondataconnect", FALSE);
 	Config->MMSCAddress = INI_GetValue(Config->smsdcfgfile, "smsd", "mmsc_address", FALSE);
 	Config->MMSCProxy = INI_GetValue(Config->smsdcfgfile, "smsd", "mmsc_proxy", FALSE);
+	Config->MMSAutoDownload = INI_GetBool(Config->smsdcfgfile, "smsd", "mms_autodownload", FALSE);
 
 	str = INI_GetValue(Config->smsdcfgfile, "smsd", "smsc", FALSE);
 	if (str) {

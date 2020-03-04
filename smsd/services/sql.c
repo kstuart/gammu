@@ -985,7 +985,12 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
 				for (int n = 0; n < SMSInfo.EntriesNum; n++) {
 					if (SMSInfo.Entries[n].ID == SMS_MMSIndicatorLong) {
-						error = MMS_ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
+						if(Config->MMSAutoDownload) {
+							error = MMS_ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
+						}
+						else {
+							SMSD_Log(DEBUG_INFO, Config, "Not configured to download MMS messages, skipping.");
+						}
 						if(error != ERR_NONE) {
 							GSM_FreeMultiPartSMSInfo(&SMSInfo);
 							return error;
