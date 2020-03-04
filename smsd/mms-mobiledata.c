@@ -12,6 +12,7 @@ gboolean SMSD_RunOn(const char*, GSM_MultiSMSMessage*, GSM_SMSDConfig*, const ch
 
 GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
 {
+	char cmd[1024];
 	assert(Config != NULL);
 	if(Config->RunOnDataConnect == NULL) {
 		SMSD_Log(DEBUG_INFO, Config, "No RunOnDataConnect script provided to register APN.");
@@ -19,7 +20,10 @@ GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
 		return ERR_NONE;
 	}
 
-	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "start", "data connect");
+	strcpy(cmd, "start ");
+	strcat(cmd, Config->PhoneID);
+
+	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, cmd, "data connect");
 	if(success == FALSE) {
 		SMSD_Log(DEBUG_ERROR, Config, "Start APN Registration script failed.");
 		return ERR_ABORTED;
@@ -29,6 +33,7 @@ GSM_Error MobileDataStart(GSM_SMSDConfig *Config)
 
 GSM_Error MobileDataStop(GSM_SMSDConfig *Config)
 {
+	char cmd[1024];
 	assert(Config);
 
 	if(Config->RunOnDataConnect == NULL) {
@@ -37,7 +42,10 @@ GSM_Error MobileDataStop(GSM_SMSDConfig *Config)
 		return ERR_NONE;
 	}
 
-	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, "stop", "data disconnect");
+	strcpy(cmd, "stop ");
+	strcat(cmd, Config->PhoneID);
+
+	gboolean success = SMSD_RunOn(Config->RunOnDataConnect, NULL, Config, cmd, "data disconnect");
 	if(success == FALSE) {
 		SMSD_Log(DEBUG_ERROR, Config, "Stop APN Registration script failed.");
 		return ERR_ABORTED;
