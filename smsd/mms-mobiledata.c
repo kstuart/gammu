@@ -124,7 +124,6 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER 
 {
 	CURL *ch;
 	CURLcode cr;
-	GSM_Error error;
 
 	if(!RespBuffer) {
 		SMSD_LogErrno(Config, "Failed to create response buffer");
@@ -165,7 +164,7 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER 
 	/* cleanup curl stuff */
 	curl_easy_cleanup(ch);
 
-	return cr == CURLE_OK && error == ERR_NONE ? ERR_NONE : ERR_ABORTED;
+	return cr == CURLE_OK ? ERR_NONE : ERR_ABORTED;
 }
 
 GSM_Error FetchMMS(GSM_SMSDConfig *Config, SBUFFER Buffer, GSM_MMSIndicator *MMSIndicator)

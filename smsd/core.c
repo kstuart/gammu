@@ -1833,7 +1833,7 @@ GSM_Error SMSD_SendSMS(GSM_SMSDConfig *Config)
 
 		if(error != ERR_NONE) {
 			SMSD_Log(DEBUG_INFO, Config, "Error sending MMS (%s)", Config->SMSID);
-			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_ERROR, -1);
+			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_SENDING_ERROR, -1);
 		}
 		else {
 			Config->Service->AddSentSMSInfo(&sms, Config, Config->SMSID, 1, SMSD_SEND_OK, -1);
