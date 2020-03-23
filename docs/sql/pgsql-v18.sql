@@ -296,4 +296,5 @@ create table outbox_mms_parts (
     "End" integer not null default 0
 );
 
+create index outbox_mms_parts_id on sentitems ("ID");
 create index outbox_mms_parts_outbox_id on outbox_mms_parts ("OUTBOX_ID");
