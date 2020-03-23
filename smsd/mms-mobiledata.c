@@ -98,6 +98,7 @@ static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const c
 {
 	CURL *ch;
 	CURLcode cr;
+	long http_code;
 
 	ch = curl_easy_init();
 	if(!ch) {
@@ -109,6 +110,7 @@ static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const c
 	curl_easy_setopt(ch, CURLOPT_URL, URL);
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, ReceiveBufferCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)Buffer);
+	curl_easy_setopt(ch, CURLOPT_FAILONERROR, 1L);
 	if(Config->MMSCProxy) {
 		curl_easy_setopt(ch, CURLOPT_PROXY, Config->MMSCProxy);
 	}
@@ -122,6 +124,9 @@ static GSM_Error CURL_GetFromURL(GSM_SMSDConfig *Config, SBUFFER Buffer, const c
 	if(cr != CURLE_OK)
 		SMSD_Log(DEBUG_ERROR, Config, "Failed to fetch URL from server: %s", curl_easy_strerror(cr));
 
+	curl_easy_getinfo(ch, CURLINFO_RESPONSE_CODE, &http_code);
+	Config->StatusCode = (int)http_code;
+
 	/* cleanup curl stuff */
 	curl_easy_cleanup(ch);
 
@@ -132,6 +137,7 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER 
 {
 	CURL *ch;
 	CURLcode cr;
+	long http_code;
 
 	if(!RespBuffer) {
 		SMSD_LogErrno(Config, "Failed to create response buffer");
@@ -155,6 +161,7 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER 
 	curl_easy_setopt(ch, CURLOPT_POSTFIELDSIZE, (long)SBUsed(Buffer));
 	curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, ReceiveBufferCallback);
 	curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void*)RespBuffer);
+	curl_easy_setopt(ch, CURLOPT_FAILONERROR, 1L);
 	if(Config->MMSCProxy) {
 		curl_easy_setopt(ch, CURLOPT_PROXY, Config->MMSCProxy);
 	}
@@ -165,9 +172,11 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER 
 	}
 	cr = curl_easy_perform(ch);
 
-
 	if(cr != CURLE_OK)
 		SMSD_Log(DEBUG_ERROR, Config, "Failed to post MMS to server: %s", curl_easy_strerror(cr));
+
+	curl_easy_getinfo(ch, CURLINFO_RESPONSE_CODE, &http_code);
+	Config->StatusCode = (int)http_code;
 
 	/* cleanup curl stuff */
 	curl_easy_cleanup(ch);

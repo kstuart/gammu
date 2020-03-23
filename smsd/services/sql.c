@@ -832,6 +832,20 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 	GSM_Error error;
 	SQL_result result;
 	SBUFFER buf = SB_InitWithCapacity(20480);
+
+	SB_PutFormattedString(buf, "update inbox set \"Status\" = %d where \"ID\" = %d;", Config->StatusCode, inbox_id);
+	SB_PutByte(buf, 0);
+	error = SMSDSQL_Query(Config, SBBase(buf), &result);
+	if(error != ERR_NONE) {
+		SB_Destroy(&buf);
+		return error;
+	}
+	Config->db->FreeResult(Config, &result);
+
+	if(Config->StatusCode >= 400)
+		return ERR_NONE;
+
+	SB_Clear(buf);
 	SB_PutString(buf, "update inbox set \"MMSHeaders\" = '");
 	MMS_DumpHeaders(buf, mms->Headers);
 	SB_PutFormattedString(buf, "' where \"ID\" = %d;", inbox_id);
@@ -1483,6 +1497,26 @@ static GSM_Error SMSDSQL_CreateOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConf
 	return ERR_NONE;
 }
 
+GSM_Error MoveSentMMSParts(GSM_SMSDConfig *Config, long long outbox_id)
+{
+	assert(Config);
+	GSM_Error error;
+	SQL_result res;
+	SBUFFER buf = SB_InitWithCapacity(4096);
+
+	SB_PutFormattedString(buf, "with sent_parts as (delete from outbox_mms_parts a where \"OUTBOX_ID\" = %lld returning a.*) ", outbox_id);
+	SB_PutString(buf, "insert into sentitems_mms_parts select * from sent_parts;");
+	SB_PutByte(buf, 0);
+	error = SMSDSQL_Query(Config, SBBase(buf), &res);
+	SB_Destroy(&buf);
+	Config->db->FreeResult(Config, &res);
+
+	if (error != ERR_NONE)
+		SMSD_Log(DEBUG_INFO, Config, "Error moving sent MMS parts (%s)", __FUNCTION__);
+
+	return error;
+}
+
 static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *ID, int Part, GSM_SMSDSendingError err, int TPMR)
 {
 	SQL_result res, r2;
@@ -1556,9 +1590,10 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 
 	if(Part == 1 && Class == GSM_CLASS_MMS) {
 		SBUFFER buf = SB_Init();
-		SB_PutString(buf, "update sentitems set \"MMS_ID\" = '");
+		SB_PutFormattedString(buf, "update sentitems set \"StatusCode\" = %d, \"MMS_ID\" = '", Config->StatusCode);
 		SB_PutAsBinHex(buf, &Config->MMSSendID.mmsTxID, sizeof(Config->MMSSendID.mmsTxID));
 		SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s' where \"ID\" = %lld;", MMSHeaders, Config->MMSSendID.outboxID);
+		SB_PutByte(buf, 0);
 		error = SMSDSQL_Query(Config, SBBase(buf), &r2);
 		SB_Destroy(&buf);
 		if (error != ERR_NONE) {
@@ -1567,6 +1602,8 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 		}
 		Config->db->FreeResult(Config, &r2);
 		Config->db->FreeResult(Config, &res);
+
+		MoveSentMMSParts(Config, Config->MMSSendID.outboxID);
 
 		Config->MMSSendID.outboxID = -1;
 		Config->MMSSendID.mmsTxID = -1;

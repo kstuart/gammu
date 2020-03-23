@@ -1411,7 +1411,7 @@ GSM_Error SMSD_FetchMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
 		SaveSBufferToTempFile(Config, Buffer);
 #endif
 
-	return error;
+	return ERR_NONE;
 }
 
 GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config, SBUFFER MMSBuffer)
