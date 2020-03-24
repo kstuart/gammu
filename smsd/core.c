@@ -1438,6 +1438,8 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 	assert(RespBuffer);
 	MMSError error;
 	GSM_Error gerr = ERR_NONE;
+
+#ifdef DEBUG
 	char fname[] = "/tmp/GSvrResp_XXXXXX";
 
 	int fd = mkstemp(fname);
@@ -1446,6 +1448,7 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 
 	close(fd);
 	SMSD_Log(DEBUG_NOTICE, Config, "Saved server response to '%s'", fname);
+#endif
 
 	if(SB_PeekByte(RespBuffer) != 0x8c) {
 		SMSD_Log(DEBUG_NOTICE, Config, "Server Response: %s", SBBase(RespBuffer));

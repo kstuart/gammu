@@ -833,7 +833,12 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 	SQL_result result;
 	SBUFFER buf = SB_InitWithCapacity(20480);
 
-	SB_PutFormattedString(buf, "update inbox set \"Status\" = %d where \"ID\" = %d;", Config->StatusCode, inbox_id);
+	MMSHEADER from = MMSHeader_FindByID(mms->Headers, MMS_HEADER, MMS_FROM);
+	if(!from)
+		SMSD_Log(DEBUG_INFO, Config, "MMS Headers does not include From field.");
+
+	SB_PutFormattedString(buf, "update inbox set \"Class\" = %d, \"Status\" = %d, \"SenderNumber\" = '%s' where \"ID\" = %d;",
+		GSM_CLASS_MMS, Config->StatusCode, from ? from->value.v.str : "Not Provided", inbox_id);
 	SB_PutByte(buf, 0);
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
 	if(error != ERR_NONE) {

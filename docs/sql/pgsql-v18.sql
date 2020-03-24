@@ -73,7 +73,7 @@ CREATE TABLE inbox (
   "UpdatedInDB" timestamp(0) WITHOUT time zone NOT NULL DEFAULT LOCALTIMESTAMP(0),
   "ReceivingDateTime" timestamp(0) WITHOUT time zone NOT NULL DEFAULT LOCALTIMESTAMP(0),
   "Text" text NOT NULL,
-  "SenderNumber" varchar(20) NOT NULL DEFAULT '',
+  "SenderNumber" varchar(128) NOT NULL DEFAULT '',
   "Coding" varchar(255) NOT NULL DEFAULT 'Default_No_Compression',
   "UDH" text NOT NULL,
   "SMSCNumber" varchar(20) NOT NULL DEFAULT '',

@@ -44,3 +44,5 @@ create index outbox_mms_parts_id on sentitems ("ID");
 
 drop index if exists outbox_mms_parts_outbox_id;
 create index outbox_mms_parts_outbox_id on outbox_mms_parts ("OUTBOX_ID");
+
+alter table inbox alter column "SenderNumber" type varchar(128) using "SenderNumber"::varchar(128);
