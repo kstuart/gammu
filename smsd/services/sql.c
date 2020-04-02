@@ -744,13 +744,13 @@ GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, MMSM
 		SB_PutString(buffer, "', 'base64'));");
 		SB_PutByte(buffer, 0);
 		error = SMSDSQL_Query(Config, SBBase(buffer), &result);
+
+		Config->db->FreeResult(Config, &result);
 		if(error != ERR_NONE) {
 			SMSD_Log(DEBUG_ERROR, Config, "Error saving MMS part.");
 			return error;
 		}
 	}
-
-	Config->db->FreeResult(Config, &result);
 
 	return  error;
 }
@@ -843,9 +843,12 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 			 strchr(from->value.v.str, '/') - from->value.v.str);
 	}
 
-
-	SB_PutFormattedString(buf, "update inbox set \"Class\" = %d, \"Status\" = %d, \"SenderNumber\" = '%s' where \"ID\" = %d;",
-		GSM_CLASS_MMS, Config->StatusCode, sender ? sender : "Not Provided", inbox_id);
+	SMSD_Log(DEBUG_INFO, Config, "InboxID(%llu)", inbox_id);
+	SB_PutFormattedString(buf, "update inbox set \"Class\" = %d, \"Status\" = %d, \"SenderNumber\" = '%s' where \"ID\" = %llu;",
+		GSM_CLASS_MMS,
+		Config->StatusCode,
+		sender ? sender : "Not Provided",
+		inbox_id);
 	SB_PutByte(buf, 0);
 	free(sender);
 
@@ -856,13 +859,15 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 	}
 	Config->db->FreeResult(Config, &result);
 
-	if(Config->StatusCode >= 400)
+	if(Config->StatusCode >= 400) {
+		SB_Destroy(&buf);
 		return ERR_NONE;
+	}
 
 	SB_Clear(buf);
 	SB_PutString(buf, "update inbox set \"MMSHeaders\" = '");
 	MMS_DumpHeaders(buf, mms->Headers);
-	SB_PutFormattedString(buf, "' where \"ID\" = %d;", inbox_id);
+	SB_PutFormattedString(buf, "' where \"ID\" = %llu;", inbox_id);
 	SB_PutByte(buf, 0);
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
 	if(error != ERR_NONE) {
