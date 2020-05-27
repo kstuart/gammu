@@ -901,7 +901,7 @@ GSM_Error SMSD_ReadConfig(const char *filename, GSM_SMSDConfig *Config, gboolean
 	Config->RunOnIncomingCall = INI_GetValue(Config->smsdcfgfile, "smsd", "runonincomingcall", FALSE);
 	Config->RunOnDataConnect = INI_GetValue(Config->smsdcfgfile, "smsd", "runondataconnect", FALSE);
 	Config->MMSCAddress = INI_GetValue(Config->smsdcfgfile, "smsd", "mmsc_address", FALSE);
-	Config->MMSCProxy = INI_GetValue(Config->smsdcfgfile, "smsd", "mmsc_proxy", FALSE);
+	Config->MMSCProxy = INI_GetValue(Config->smsdcfgfile, "smsd", "mms_proxy", FALSE);
 	Config->MMSAutoDownload = INI_GetBool(Config->smsdcfgfile, "smsd", "mms_autodownload", FALSE);
 
 	str = INI_GetValue(Config->smsdcfgfile, "smsd", "smsc", FALSE);
