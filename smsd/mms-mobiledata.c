@@ -217,7 +217,9 @@ GSM_Error SendMMS(GSM_SMSDConfig *Config, SBUFFER Buffer)
 		return error;
 	}
 
+	SMSD_Log(DEBUG_INFO, Config, "Posting message to %s", Config->MMSCAddress);
 	error = CURL_PostToURL(Config, Buffer, RespBuffer, Config->MMSCAddress);
+	SMSD_Log(DEBUG_INFO, Config, "Post request completed. (%X)", error);
 
 	if(MobileDataStop(Config) != ERR_NONE)
 		SMSD_Log(DEBUG_ERROR, Config, "Failed to disconnect APN network.");
