@@ -1345,7 +1345,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			}
 		}
 
-		if (text == NULL || text_len == 0) {
+		if (Class != GSM_CLASS_MMS && (text == NULL || text_len == 0)) {
 			if (text_decoded == NULL) {
 				SMSD_Log(DEBUG_ERROR, Config, "Message without text!");
 				return ERR_UNKNOWN;
@@ -1600,6 +1600,8 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	vars[6].type = SQL_TYPE_NONE;
 
 	int Class = (char)db->GetNumber(Config, &res, 3);
+	CSTR Coding = db->GetString(Config, &res, 1);
+	CSTR TextDecoded = db->GetString(Config, &res, 4);
 	CSTR MMSHeaders = db->GetString(Config, &res, 14);
 
 	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_ADD_SENT_INFO], &sms->SMS[Part - 1], NULL, vars, &r2, FALSE);
@@ -1613,7 +1615,7 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 		SBUFFER buf = SB_Init();
 		SB_PutFormattedString(buf, "update sentitems set \"StatusCode\" = %d, \"MMS_ID\" = '", Config->StatusCode);
 		SB_PutAsBinHex(buf, &Config->MMSSendID.mmsTxID, sizeof(Config->MMSSendID.mmsTxID));
-		SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s' where \"ID\" = %lld;", MMSHeaders, Config->MMSSendID.outboxID);
+		SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s', \"Coding\" = '%s', \"TextDecoded\" = '%s'  where \"ID\" = %lld;", MMSHeaders, Coding, TextDecoded, Config->MMSSendID.outboxID);
 		SB_PutByte(buf, 0);
 		error = SMSDSQL_Query(Config, SBBase(buf), &r2);
 		SB_Destroy(&buf);
