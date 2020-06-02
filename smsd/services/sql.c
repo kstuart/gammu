@@ -1024,10 +1024,6 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 						else {
 							SMSD_Log(DEBUG_INFO, Config, "Not configured to download MMS messages, skipping.");
 						}
-						if(error != ERR_NONE) {
-							GSM_FreeMultiPartSMSInfo(&SMSInfo);
-							return error;
-						}
 					}
 				}
 				GSM_FreeMultiPartSMSInfo(&SMSInfo);
