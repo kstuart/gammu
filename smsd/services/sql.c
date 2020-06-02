@@ -1238,6 +1238,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	const char *udh;
 	const char *q;
 	const char *status;
+	const char *mms_headers;
 	long outbox_id;
 	size_t udh_len;
 	SQL_Var vars[3];
@@ -1389,7 +1390,8 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 
 
 		if(i == 1 &&  Class == GSM_CLASS_MMS) {
-			error = SMSDSQL_PrepareOutboxMMS(Config, outbox_id, destination, text_decoded, Config->MMSBuffer);
+			mms_headers = db->GetString(Config, &res, 14);
+			error = SMSDSQL_PrepareOutboxMMS(Config, outbox_id, destination, mms_headers, Config->MMSBuffer);
 			if(error != ERR_NONE && error != ERR_EMPTY) {
 				db->FreeResult(Config, &res);
 				return error;
