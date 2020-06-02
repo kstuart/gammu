@@ -1345,35 +1345,37 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			}
 		}
 
-		if (Class != GSM_CLASS_MMS && (text == NULL || text_len == 0)) {
-			if (text_decoded == NULL) {
-				SMSD_Log(DEBUG_ERROR, Config, "Message without text!");
-				return ERR_UNKNOWN;
+		if (Class != GSM_CLASS_MMS) {
+			if (text == NULL || text_len == 0) {
+				if (text_decoded == NULL) {
+					SMSD_Log(DEBUG_ERROR, Config, "Message without text!");
+					return ERR_UNKNOWN;
+				} else {
+					SMSD_Log(DEBUG_NOTICE, Config, "Message: %s", text_decoded);
+					DecodeUTF8(sms->SMS[sms->Number].Text, text_decoded, strlen(text_decoded));
+				}
 			} else {
-				SMSD_Log(DEBUG_NOTICE, Config, "Message: %s", text_decoded);
-				DecodeUTF8(sms->SMS[sms->Number].Text, text_decoded, strlen(text_decoded));
-			}
-		} else {
-			switch (sms->SMS[sms->Number].Coding) {
-				case SMS_Coding_Unicode_No_Compression:
+				switch (sms->SMS[sms->Number].Coding) {
+					case SMS_Coding_Unicode_No_Compression:
 
-				case SMS_Coding_Default_No_Compression:
-					if (! DecodeHexUnicode(sms->SMS[sms->Number].Text, text, text_len)) {
-						SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
-						return ERR_UNKNOWN;
-					}
-					break;
+					case SMS_Coding_Default_No_Compression:
+						if (!DecodeHexUnicode(sms->SMS[sms->Number].Text, text, text_len)) {
+							SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
+							return ERR_UNKNOWN;
+						}
+						break;
 
-				case SMS_Coding_8bit:
-					if (! DecodeHexBin(sms->SMS[sms->Number].Text, text, text_len)) {
-						SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
-						return ERR_UNKNOWN;
-					}
-					sms->SMS[sms->Number].Length = text_len / 2;
-					break;
+					case SMS_Coding_8bit:
+						if (!DecodeHexBin(sms->SMS[sms->Number].Text, text, text_len)) {
+							SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
+							return ERR_UNKNOWN;
+						}
+						sms->SMS[sms->Number].Length = text_len / 2;
+						break;
 
-				default:
-					break;
+					default:
+						break;
+				}
 			}
 		}
 
