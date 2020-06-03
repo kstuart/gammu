@@ -224,8 +224,10 @@ GSM_Error SendMMS(GSM_SMSDConfig *Config, SBUFFER Buffer)
 	if(MobileDataStop(Config) != ERR_NONE)
 		SMSD_Log(DEBUG_ERROR, Config, "Failed to disconnect APN network.");
 
-	if(SBUsed(RespBuffer))
+	if(SBUsed(RespBuffer)) {
+		SMSD_Log(DEBUG_NOTICE, Config, "Received a server response.");
 		SMSD_ProcessServerResponse(Config, RespBuffer);
+	}
 
 	SB_Destroy(&RespBuffer);
 	return error;

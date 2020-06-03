@@ -1457,7 +1457,9 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 	MMSMESSAGE m = NULL;
 	error = MMS_MapEncodedMessage(Config, RespBuffer, &m);
 	if(error != MMS_ERR_NONE) {
-		MMSMessage_Destroy(&m);
+		SMSD_Log(DEBUG_NOTICE, Config, "Could not map server response.");
+		if(m)
+			MMSMessage_Destroy(&m);
 		return ERR_NONE;
 	}
 
@@ -1833,6 +1835,8 @@ GSM_Error SMSD_SendSMS(GSM_SMSDConfig *Config)
 	if(error == MMS_MESSAGE_TO_SEND) {
 		assert(sms.Number == 1);
 		error = SMSD_SendMMS(Config, Config->MMSBuffer);
+
+		SMSD_LogError(DEBUG_NOTICE, Config, "SendMMS completed: ", error);
 
 		if(error != ERR_NONE) {
 			SMSD_Log(DEBUG_INFO, Config, "Error sending MMS (%s)", Config->SMSID);

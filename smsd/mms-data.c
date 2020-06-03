@@ -572,13 +572,15 @@ MMSMESSAGE MMSMessage_Init()
 
 void MMSMessage_Destroy(MMSMESSAGE *message)
 {
-	MMSHeaders_Destroy(&(*message)->Headers);
-	MMSParts_Destroy(&(*message)->Parts);
-	if((*message)->id)
-		free((*message)->id);
+	if(*message == NULL) {
+		MMSHeaders_Destroy(&(*message)->Headers);
+		MMSParts_Destroy(&(*message)->Parts);
+		if ((*message)->id)
+			free((*message)->id);
 
-	free(*message);
-	*message = NULL;
+		free(*message);
+		*message = NULL;
+	}
 }
 
 MMSError MMSMessage_SetID(MMSMESSAGE message, CSTR id)
