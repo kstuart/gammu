@@ -151,6 +151,7 @@ MMSError MMS_EncodeText(SBUFFER stream, CSTR text)
 		SB_PutByte(stream, TEXT_QUOTE);
 
 	SB_PutString(stream, text);
+	SB_PutByte(stream, 0);
 	return MMS_ERR_NONE;
 }
 
@@ -275,6 +276,7 @@ MMSError MMS_EncodeTypedParameter(SBUFFER stream, TYPEDPARAM param)
 	switch(param->value.type) {
 		default:
 			printf("No encoder for typed parameter: %s\n", param->type->name);
+			break;
 		case VT_WK_CHARSET:
 		case VT_ENUM:
 			MMS_EncodeInteger(stream, param->value.v.enum_v->code);

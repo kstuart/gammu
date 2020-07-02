@@ -91,6 +91,8 @@ MMSError MMS_DecodeDate(SBUFFER stream, MMSVALUE out)
 		return error;
 
 	out->type = VT_DATE;
+
+	return MMS_ERR_NONE;
 }
 
 MMSError MMS_DecodeInteger(SBUFFER stream, MMSVALUE out)

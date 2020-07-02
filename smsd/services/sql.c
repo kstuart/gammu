@@ -755,6 +755,52 @@ GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, MMSM
 	return  error;
 }
 
+GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MMSStatus status, GSM_DateTime ts)
+{
+	GSM_Error error;
+	SQL_result result;
+	struct GSM_SMSDdbobj *db = Config->db;
+	SBUFFER buf = SB_InitWithCapacity(1024);
+	CSTR StatusValue;
+	char deliveryTime[60];
+
+	assert(Config);
+	assert(msgid);
+
+	switch(status) {
+		default: StatusValue = "Error";
+		break;
+		case MMS_STATUS_EXPIRED:
+		case MMS_STATUS_REJECTED: StatusValue = "DeliveryFailed"; break;
+		case MMS_STATUS_RETRIEVED: StatusValue = "DeliveryOK"; break;
+		case MMS_STATUS_DEFERRED: StatusValue = "DeliveryPending"; break;
+	}
+
+	SMSDSQL_Time2String(Config, Fill_Time_T(ts), deliveryTime, 60);
+
+	SB_PutFormattedString(buf, "update sentitems set \"Status\" = '%s', \"DeliveryDateTime\" = '%s' where \"MMS_ID\" = '%s';",
+		StatusValue,
+		deliveryTime,
+		msgid);
+	SB_PutByte(buf, 0);
+
+	error = SMSDSQL_Query(Config, SBBase(buf), &result);
+	if(error != ERR_NONE) {
+		SB_Destroy(&buf);
+		return error;
+	}
+
+	SB_Destroy(&buf);
+
+	if (db->AffectedRows(Config, &result) == 0) {
+		SMSD_Log(DEBUG_INFO, Config, "Received MMS delivery report but the Message-ID(%s) is not recognized.", msgid);
+	}
+
+	db->FreeResult(Config, &result);
+
+	return ERR_NONE;
+}
+
 GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 {
 	GSM_Error error;
@@ -816,6 +862,7 @@ GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 	MMSValue_AsString(buf, &Status->value);
 	SB_PutString(buf, "\n");
 	SB_PutFormattedString(buf, "' where \"ID\" = '%s';", sent_id);
+	SB_PutByte(buf, 0);
 	Config->db->FreeResult(Config, &result);
 
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
@@ -1210,8 +1257,8 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	MMS_EncodeMessage(MMSBuffer, m);
 	MMSMessage_Destroy(&m);
 
-	Config->MMSSendID.outboxID = outbox_id;
-	Config->MMSSendID.mmsTxID = txid;
+	Config->MMSSendInfo.outboxID = outbox_id;
+	Config->MMSSendInfo.mmsTxID = txid;
 
 	return error;
 }
@@ -1531,7 +1578,68 @@ GSM_Error MoveSentMMSParts(GSM_SMSDConfig *Config, long long outbox_id)
 	Config->db->FreeResult(Config, &res);
 
 	if (error != ERR_NONE)
-		SMSD_Log(DEBUG_INFO, Config, "Error moving sent MMS parts (%s)", __FUNCTION__);
+		SMSD_Log(DEBUG_ERROR, Config, "Error moving sent MMS parts (%s)", __FUNCTION__);
+
+	return error;
+}
+
+GSM_Error SMSDSQL_AddSentMMSInfo(GSM_SMSDConfig *Config, CSTR Coding, CSTR TextDecoded, CSTR MMSHeaders)
+{
+	GSM_Error error;
+	SQL_result res;
+	MMSMESSAGE sendConf = Config->MMSSendInfo.sendConf;
+	MMSHEADER messageId = NULL;
+	MMSHEADER sendStatus = NULL;
+	CSTR statusText = NULL;
+	SBUFFER buf = SB_Init();
+
+	if(sendConf) {
+		messageId = MMSMessage_FindHeader(sendConf, MMS_HEADER, MMS_MESSAGE_ID);
+		if(!messageId)
+			SMSD_Log(DEBUG_INFO, Config, "Got server response without message id field.");
+
+		sendStatus = MMSMessage_FindHeader(sendConf, MMS_HEADER, MMS_RESPONSE_STATUS);
+		if(!sendStatus)
+			SMSD_Log(DEBUG_INFO, Config, "Got server response without status field.");
+	}
+
+	if(sendStatus) {
+		SMSD_Log(DEBUG_NOTICE, Config, "MMS SendStatus: %s",	sendStatus->value.v.enum_v->name);
+		if(sendStatus->value.v.enum_v->code != MMS_RESP_OK)
+			statusText = "Error";// sendStatus->value.v.enum_v->name;
+	}
+
+	SB_PutFormattedString(buf, "update sentitems set \"StatusCode\" = %d, \"MMS_ID\" = '", Config->StatusCode);
+
+	if(messageId)
+		SB_PutBytes(buf, messageId->value.v.str, strlen(messageId->value.v.str));
+	else
+		SB_PutAsBinHex(buf, &Config->MMSSendInfo.mmsTxID, sizeof(Config->MMSSendInfo.mmsTxID));
+
+	if(statusText)
+		SB_PutFormattedString(buf, "', \"Status\" = '%s", statusText);
+
+	SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s', \"Coding\" = '%s', \"TextDecoded\" = '%s'  where \"ID\" = %lld;",
+		MMSHeaders, Coding, TextDecoded, Config->MMSSendInfo.outboxID);
+	SB_PutByte(buf, 0);
+
+	error = SMSDSQL_Query(Config, SBBase(buf), &res);
+	SB_Destroy(&buf);
+	if (error != ERR_NONE) {
+		SMSD_Log(DEBUG_INFO, Config, "Error writing to database (%s)", __FUNCTION__);
+		return error;
+	}
+	Config->db->FreeResult(Config, &res);
+
+	error = MoveSentMMSParts(Config, Config->MMSSendInfo.outboxID);
+
+	Config->MMSSendInfo.outboxID = -1;
+	Config->MMSSendInfo.mmsTxID = -1;
+
+	if(sendConf) {
+		MMSMessage_Destroy(&sendConf);
+		SB_Destroy(&Config->MMSSendInfo.sendConfBuffer);
+	}
 
 	return error;
 }
@@ -1609,26 +1717,8 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	}
 	db->FreeResult(Config, &r2);
 
-	if(Part == 1 && Class == GSM_CLASS_MMS) {
-		SBUFFER buf = SB_Init();
-		SB_PutFormattedString(buf, "update sentitems set \"StatusCode\" = %d, \"MMS_ID\" = '", Config->StatusCode);
-		SB_PutAsBinHex(buf, &Config->MMSSendID.mmsTxID, sizeof(Config->MMSSendID.mmsTxID));
-		SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s', \"Coding\" = '%s', \"TextDecoded\" = '%s'  where \"ID\" = %lld;", MMSHeaders, Coding, TextDecoded, Config->MMSSendID.outboxID);
-		SB_PutByte(buf, 0);
-		error = SMSDSQL_Query(Config, SBBase(buf), &r2);
-		SB_Destroy(&buf);
-		if (error != ERR_NONE) {
-			SMSD_Log(DEBUG_INFO, Config, "Error writing to database (%s)", __FUNCTION__);
-			return error;
-		}
-		Config->db->FreeResult(Config, &r2);
-		Config->db->FreeResult(Config, &res);
-
-		MoveSentMMSParts(Config, Config->MMSSendID.outboxID);
-
-		Config->MMSSendID.outboxID = -1;
-		Config->MMSSendID.mmsTxID = -1;
-	}
+	if(Part == 1 && Class == GSM_CLASS_MMS)
+		SMSDSQL_AddSentMMSInfo(Config, Coding, TextDecoded, MMSHeaders);
 
 	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_UPDATE_SENT], &sms->SMS[Part - 1], NULL, NULL, &res, FALSE);
 	if (error != ERR_NONE) {

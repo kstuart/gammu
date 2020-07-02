@@ -127,6 +127,9 @@ MMSError MMSValue_AsString(SBUFFER stream, MMSVALUE v)
 		case VT_CONTENT_TYPE:
 			MMS_ContentTypeAsString(stream, &v->v.content_type);
 			break;
+		case VT_LOCAL_TXID:
+			SB_PutFormattedString(stream, "%llx", v->v.local_txid);
+			break;
 	}
 
 	return MMS_ERR_NONE;
@@ -199,13 +202,12 @@ MMSError MMSValue_CopyStr(MMSVALUE v, MMSValueType t, CSTR str)
 	assert(str);
 	MMSValue_Clear(v);
 
-	v->v.str = malloc(strlen(str) + 1);
+	v->v.str = strdup(str);
 	if(!v->v.str)
 		return MMS_ERR_MEMORY;
 
 	v->allocated = 1;
 	v->type = t;
-	strcpy(v->v.str, str);
 	return MMS_ERR_NONE;
 }
 
@@ -263,7 +265,7 @@ MMSError MMSValue_SetFromString(MMSVALUE v, MMSFIELDINFO fi, CSTR str)
 
 	switch(fi->vt) {
 		default:
-			printf("No setter for value of %s", fi->name);
+			printf("No setter for value of %s\n", fi->name);
 			return MMS_ERR_UNIMPLEMENTED;
 		case VT_ENCODED_STRING:
 			error = MMSValue_SetEncodedString(v, NULL, str);
@@ -297,6 +299,8 @@ MMSError MMSValue_Encode(SBUFFER stream, MMSVALUE v)
 		case VT_LONG_INT:
 		case VT_DATE:
 			return MMS_EncodeLongInteger(stream, v->v.long_int);
+		case VT_TEXT:
+			return MMS_EncodeTokenText(stream, v->v.str);
 		case VT_ENCODED_STRING:
 			return MMS_EncodeEncodedText(stream, v->v.encoded_string.charset, v->v.encoded_string.text);
 		case VT_FROM:
@@ -664,6 +668,16 @@ MMSError MMSMessage_SetTransactionID(MMSMESSAGE m, LocalTXID txid)
 	return MMSValue_SetLocalTransactionID(&h->value, txid);
 }
 
+MMSError MMSMessage_SetMessageID(MMSMESSAGE m, CSTR msgid)
+{
+	assert(m);
+	MMSHEADER h = MMSMessage_FindOrNewHeader(m, MMS_HEADER, MMS_MESSAGE_ID);
+	if(!h)
+		return MMS_ERR_MEMORY;
+
+	return MMSValue_CopyStr(&h->value, VT_TEXT, msgid);
+}
+
 MMSError MMSMessage_SetDeliveryReport(MMSMESSAGE m, MMSVALUEENUM v)
 {
 	assert(m);
@@ -672,6 +686,16 @@ MMSError MMSMessage_SetDeliveryReport(MMSMESSAGE m, MMSVALUEENUM v)
 		return MMS_ERR_MEMORY;
 
 	return MMSValue_SetEnum(&h->value, VT_YESNO, v);
+}
+
+MMSError MMSMessage_SetResponseStatus(MMSMESSAGE m, MMSVALUEENUM v)
+{
+	assert(m);
+	MMSHEADER h = MMSMessage_FindOrNewHeader(m, MMS_HEADER, MMS_RESPONSE_STATUS);
+	if(!h)
+		return MMS_ERR_MEMORY;
+
+	return MMSValue_SetEnum(&h->value, VT_RESPONSE_STATUS, v);
 }
 
 MMSError MMSMessage_CopyAddressFrom(MMSMESSAGE m, ENCODEDSTRING from)

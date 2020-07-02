@@ -408,11 +408,11 @@ MMSVALUEENUM MMS_YesNo_FindByID(int id)
 }
 
 MMSValueEnum MMSStatusValueEnum[] = {
-	{ "Expired", 128 },
-	{ "Retrieved", 129 },
-	{ "Rejected", 130 },
-	{ "Deferred", 131 },
-	{ "Unrecognised", 132 },
+	{ "Expired", MMS_STATUS_EXPIRED },
+	{ "Retrieved", MMS_STATUS_RETRIEVED },
+	{ "Rejected", MMS_STATUS_REJECTED },
+	{ "Deferred", MMS_STATUS_DEFERRED },
+	{ "Unrecognised", MMS_STATUS_UNRECOGNIZED },
 };
 size_t MMSStatusValueEnumSize = sizeof(MMSStatusValueEnum) / sizeof(MMSStatusValueEnum[0]);
 
@@ -428,15 +428,15 @@ MMSVALUEENUM MMS_StatusValue_FindByID(int id)
 }
 
 MMSValueEnum MMSResponseStatusEnum[] = {
-	{ "Ok" , 128 },
-	{ "Error-unspecified" , 129 },
-	{ "Error- service-denied" , 130 },
-	{ "Error-message-format-corrupt", 131 },
-	{ "Error-sending-address-unresolved" , 132 },
-	{ "Error-message-not-found" , 133 },
-	{ "Error-network-problem" , 134 },
-	{ "Error- content-not-accepted" , 135 },
-	{ "Error-unsupported-message" , 136 },
+	{ "Ok" , MMS_RESP_OK },
+	{ "Error-unspecified" , MMS_RESP_ERR_UNSPECIFIED },
+	{ "Error-service-denied" , MMS_RESP_ERR_SERVICE_DENIED },
+	{ "Error-message-format-corrupt", MMS_RESP_ERR_MSG_FMT_CORRUPT },
+	{ "Error-sending-address-unresolved" , MMS_RESP_ERR_SND_ADDR_UNRESOLVED },
+	{ "Error-message-not-found" , MMS_RESP_ERR_MSG_NOT_FOUND },
+	{ "Error-network-problem" , MMS_RESP_ERR_NETWORK },
+	{ "Error-content-not-accepted" , MMS_RESP_ERR_CONTENT_NOT_ACCEPTED },
+	{ "Error-unsupported-message" , MMS_RESP_ERR_MSG_UNSUPPORTED },
 };
 size_t MMSResponseStatusEnumSize = sizeof(MMSResponseStatusEnum) / sizeof(MMSResponseStatusEnum[0]);
 

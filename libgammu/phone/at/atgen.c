@@ -6385,7 +6385,7 @@ GSM_Reply_Function ATGENReplyFunctions[] = {
 {ATGEN_GenericReply,		"AT\n"			,0x00,0x00,ID_Initialise	 },
 {ATGEN_GenericReply,		"OK"			,0x00,0x00,ID_Initialise	 },
 {ATGEN_GenericReply,		"AT\r"			,0x00,0x00,ID_IncomingFrame	 },
-{ATGEN_GenericReplyIgnore,	"#MMSSEND:"			,0x00,0x00,ID_IncomingFrame	 },
+{ATGEN_IncomingMMSSend,	 "#MMSSEND:"			,0x00,0x00,ID_IncomingFrame	 },
 
 {NULL,				"\x00"			,0x00,0x00,ID_None		 }
 };

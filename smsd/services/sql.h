@@ -14,6 +14,16 @@ extern GSM_SMSDService SMSDSQL;
  */
 time_t SMSDSQL_ParseDate(GSM_SMSDConfig * Config, const char *date);
 
+/**
+ * Updates the delivery status of an MMS message
+ *
+ * @param Config
+ * @param msgid the MMS message ID provided by the MMSC
+ * @param status the MMS delivery status
+ * @param ts the time of status change event (delivery time)
+ */
+GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MMSStatus status, GSM_DateTime* ts);
+
 #endif
 
 /* How should editor hadle tabs in this file? Add editor commands here.

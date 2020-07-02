@@ -3,6 +3,9 @@
 
 #include "gammu-error.h"
 #include "gammu-inifile.h"
+#include "log.h"
+#include "mms-data.h"
+#include "mms-tables.h"
 #include <string.h>
 #include <signal.h>
 #include <time.h>
@@ -460,8 +463,10 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 
 	Config->MMSConveyor = &MMSMobileDataConveyor;
 	Config->MMSBuffer = SB_InitWithCapacity(MMS_INIT_BUFFER_SIZE);
-	Config->MMSSendID.outboxID = -1;
-	Config->MMSSendID.mmsTxID = -1;
+	Config->MMSSendInfo.outboxID = -1;
+	Config->MMSSendInfo.mmsTxID = -1;
+	Config->MMSSendInfo.sendConf = NULL;
+	Config->MMSSendInfo.sendConfBuffer = NULL;
 
 	return Config;
 }
@@ -1418,7 +1423,7 @@ GSM_Error SMSD_SendMMS(GSM_SMSDConfig *Config, SBUFFER MMSBuffer)
 {
 	assert(Config);
 	assert(MMSBuffer);
-	long outbox_id = Config->MMSSendID.outboxID;
+	long outbox_id = Config->MMSSendInfo.outboxID;
 	GSM_Error error;
 
 	if(outbox_id < 1) {
@@ -1452,31 +1457,48 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 
 	if(SB_PeekByte(RespBuffer) != 0x8c) {
 		SMSD_Log(DEBUG_NOTICE, Config, "Server Response: %s", SBBase(RespBuffer));
-	}
-
-	MMSMESSAGE m = NULL;
-	error = MMS_MapEncodedMessage(Config, RespBuffer, &m);
-	if(error != MMS_ERR_NONE) {
-		SMSD_Log(DEBUG_NOTICE, Config, "Could not map server response.");
-		if(m)
-			MMSMessage_Destroy(&m);
 		return ERR_NONE;
 	}
 
-	SBUFFER out = SB_Init();
-	MMS_DumpHeaders(out, m->Headers);
-	SB_PutByte(out, 0);
-	SMSD_Log(DEBUG_NOTICE, Config, "Server Response:\n%s", SBBase(out));
-
-	MMSHEADER h = MMSMessage_FindHeader(m, MMS_HEADER, MMS_RESPONSE_STATUS);
-	if(!h) {
-		SMSD_Log(DEBUG_INFO, Config, "Got server response without status field.");
+	MMSMESSAGE *m = &Config->MMSSendInfo.sendConf;
+	if(*m) {
+		MMSMessage_Destroy(m);
+		SB_Destroy(&Config->MMSSendInfo.sendConfBuffer);
 	}
 
+	error = MMS_MapEncodedMessage(Config, RespBuffer, m);
+	if(error != MMS_ERR_NONE) {
+		SMSD_Log(DEBUG_NOTICE, Config, "Could not map server response.");
+		return ERR_NONE;
+	}
 
+	if((*m)->MessageType->code != M_SEND_CONF) {
+		SMSD_Log(DEBUG_INFO, Config, "Unexpected response, expected m-send-conf message but got %s", (*m)->MessageType->name);
+		MMSMessage_Destroy(m);
+		return ERR_NONE;
+	}
+
+	Config->MMSSendInfo.sendConfBuffer = RespBuffer;
+
+	SBUFFER out = SB_Init();
+	MMS_DumpHeaders(out, (*m)->Headers);
+	SB_PutByte(out, 0);
+	SMSD_Log(DEBUG_NOTICE, Config, "Server Response:\n%s", SBBase(out));
 	SB_Destroy(&out);
-	MMSMessage_Destroy(&m);
+
 	return ERR_NONE;
+}
+
+void SMSD_IncomingMMSSendCallback(GSM_StateMachine *s,  CSTR msgid, void *user_data)
+{
+	GSM_SMSDConfig *Config = user_data;
+	GSM_DateTime now;
+	assert(Config);
+	assert(msgid);
+
+	GSM_GetCurrentDateTime(&now);
+
+	SMSDSQL_UpdateDeliveryStatusMMS(Config, msgid, MMS_STATUS_RETRIEVED, &now);
 }
 
 GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
@@ -2398,6 +2420,7 @@ GSM_Error SMSD_MainLoop(GSM_SMSDConfig *Config, gboolean exit_on_failure, int ma
 				}
 
 				GSM_SetIncomingSMSCallback(Config->gsm, SMSD_IncomingSMSCallback, Config);
+				GSM_SetIncomingMMSSendCallback(Config->gsm, SMSD_IncomingMMSSendCallback, Config);
 
 				/* We use polling so store messages to SIM */
 				GSM_SetIncomingSMS(Config->gsm, TRUE);

@@ -2471,6 +2471,51 @@ GSM_Error ATGEN_IncomingSMSDeliver(GSM_Protocol_Message *msg, GSM_StateMachine *
 	return ERR_NONE;
 }
 
+GSM_Error ATGEN_IncomingMMSSend(GSM_Protocol_Message *msg, GSM_StateMachine *s)
+{
+	char msgid[80];
+	gboolean inquote = FALSE;
+	const int position = 9;
+
+	assert(msg && msg->Buffer);
+
+	assert(strncasecmp("#MMSSEND:", msg->Buffer, position) == 0);
+
+	const char *input = msg->Buffer + position + 1;
+	char *out = msgid;
+
+	while(isspace(*input)) input++;
+
+	while(*input != 0x0d && *input != 0x00) {
+		if(*input == '"') {
+			if(inquote) {
+				break;
+			}
+			else {
+				inquote = TRUE;
+				input++;
+			}
+		}
+
+		*out = *input;
+		input++;
+		out++;
+	}
+	*out = 0;
+
+	if(!msgid[0]) {
+		smprintf_level(s, D_ERROR, "could not parse MMS Message-ID\n");
+		return ERR_INVALIDDATA;
+	}
+
+	smprintf_level(s, D_TEXT, "MMS Message-ID: %s\n", msgid);
+
+	if(s->User.IncomingMMSSend)
+		s->User.IncomingMMSSend(s, msgid, s->User.IncomingMMSSendUserData);
+
+	return ERR_NONE;
+}
+
 GSM_Error ATGEN_IncomingSMSReport(GSM_Protocol_Message *msg, GSM_StateMachine *s)
 {
   GSM_Error error;

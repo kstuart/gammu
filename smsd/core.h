@@ -4,6 +4,8 @@
 #ifndef __core_h_
 #define __core_h_
 
+#include "mms-data.h"
+#include "mms-tables.h"
 #include <gammu.h>
 #include <gammu-smsd.h>
 
@@ -67,11 +69,14 @@ typedef struct {
 	GSM_Error	(*ReadConfiguration) (GSM_SMSDConfig *Config);
 } GSM_SMSDService;
 
-typedef struct _MMSSentID {
+typedef struct _MMSSendInfo {
 	long long outboxID;
 	LocalTXID mmsTxID;
-} MMSSentID;
-typedef struct _MMSSentID *MMSSENTID;
+
+	SBUFFER sendConfBuffer;
+	MMSMESSAGE sendConf;
+} MMSSendInfo;
+typedef struct _MMSSendInfo *MMSSENDINFO;
 
 struct _GSM_SMSDConfig {
 	const char	*ServiceName;
@@ -224,9 +229,10 @@ struct _GSM_SMSDConfig {
 #endif
 	GSM_SMSDStatus *Status;
 	GSM_SMSDService		*Service;
+
 	MMSCONVEYOR MMSConveyor;
 	SBUFFER MMSBuffer;
-	MMSSentID MMSSendID;
+	MMSSendInfo MMSSendInfo;
 };
 
 

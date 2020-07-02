@@ -1849,6 +1849,11 @@ void GSM_SetIncomingUSSDCallback(GSM_StateMachine *s, IncomingUSSDCallback callb
 	s->User.IncomingUSSD = callback;
 	s->User.IncomingUSSDUserData = user_data;
 }
+void GSM_SetIncomingMMSSendCallback(GSM_StateMachine *s, IncomingMMSSendCallback  callback, void *user_data)
+{
+ s->User.IncomingMMSSend = callback;
+ s->User.IncomingMMSSendUserData = user_data;
+}
 
 void GSM_SetSendSMSStatusCallback(GSM_StateMachine *s, SendSMSStatusCallback callback, void *user_data)
 {

@@ -320,7 +320,9 @@ MMSError MMSMessage_AddPart(MMSMESSAGE m, CSTR media, CPTR data, size_t data_len
 MMSError MMSMessage_SetMessageType(MMSMESSAGE m,  MMSMessageTypeID type);
 MMSError MMSMessage_SetMessageVersion(MMSMESSAGE m, MMSVersion v);
 MMSError MMSMessage_SetTransactionID(MMSMESSAGE m, LocalTXID txid);
+MMSError MMSMessage_SetMessageID(MMSMESSAGE m, CSTR msgid);
 MMSError MMSMessage_SetDeliveryReport(MMSMESSAGE m, MMSVALUEENUM v);
+MMSError MMSMessage_SetResponseStatus(MMSMESSAGE m, MMSVALUEENUM v);
 
 MMSError MMSMessage_CopyAddressFrom(MMSMESSAGE m, ENCODEDSTRING from);
 MMSError MMSMessage_CopyAddressTo(MMSMESSAGE m, ENCODEDSTRING to);

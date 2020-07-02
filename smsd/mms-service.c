@@ -128,14 +128,18 @@ MMSError MMS_MapEncodedMessage(GSM_SMSDConfig *Config, SBUFFER Stream, MMSMESSAG
 
 	headers = m->Headers;
 	MMSHEADER h = MMSHeader_FindByID(headers, MMS_HEADER, MMS_MESSAGE_TYPE);
-	if(!h)
+	if(!h) {
+		MMSMessage_Destroy(&m);
 		return MMS_ERR_REQUIRED_FIELD;
+	}
 
 	m->MessageType = h->value.v.enum_v;
 
 	h = MMSHeader_FindByID(headers, MMS_HEADER, MMS_MMS_VERSION);
-	if(!h)
+	if(!h) {
+		MMSMessage_Destroy(&m);
 		return MMS_ERR_REQUIRED_FIELD;
+	}
 
 	m->Version = h->value.v.short_int;
 

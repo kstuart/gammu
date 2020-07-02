@@ -53,6 +53,14 @@ typedef void (*IncomingUSSDCallback) (GSM_StateMachine * s,
 				      GSM_USSDMessage *ussd, void *user_data);
 
 /**
+ * Callback for MMSSEND notification.
+ *
+ * \ingroup Callback
+ */
+typedef void (*IncomingMMSSendCallback) (GSM_StateMachine * s,
+                                         const char *msgid, void *user_data);
+
+/**
  * Callback for sending SMS.
  *
  * \ingroup Callback
@@ -109,6 +117,18 @@ void GSM_SetIncomingCBCallback(GSM_StateMachine * s,
 void GSM_SetIncomingUSSDCallback(GSM_StateMachine * s,
 				 IncomingUSSDCallback callback,
 				 void *user_data);
+
+/**
+ * Sets callback for incoming MMSSEND notification.
+ *
+ * \param s State machine.
+ * \param callback Pointer to callback function.
+ * \param user_data Second parameter which will be passed to callback.
+ *
+ * \ingroup Callback
+ */
+void GSM_SetIncomingMMSSendCallback(GSM_StateMachine *s,
+	IncomingMMSSendCallback callback, void *user_data);
 
 /**
  * Sets callback for sending SMS.

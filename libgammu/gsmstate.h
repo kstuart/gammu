@@ -1450,11 +1450,13 @@ struct _GSM_User {
 	IncomingSMSCallback IncomingSMS;
 	IncomingCBCallback IncomingCB;
 	IncomingUSSDCallback IncomingUSSD;
+	IncomingMMSSendCallback IncomingMMSSend;
 	SendSMSStatusCallback SendSMSStatus;
 	void * IncomingCallUserData;
 	void * IncomingSMSUserData;
 	void * IncomingCBUserData;
 	void * IncomingUSSDUserData;
+	void * IncomingMMSSendUserData;
 	void * SendSMSStatusUserData;
 };
 

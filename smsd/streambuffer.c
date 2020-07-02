@@ -368,6 +368,7 @@ int SB_PutString(SBUFFER buffer, const char *string)
 }
 
 // does not null terminate string
+__attribute__ ((format (printf, 2, 3)))
 int SB_PutFormattedString(SBUFFER buffer, const char *fmt, ...)
 {
 	assert(buffer);
