@@ -20,10 +20,10 @@ time_t SMSDSQL_ParseDate(GSM_SMSDConfig * Config, const char *date);
  * @param Config
  * @param msgid the MMS message ID provided by the MMSC
  * @param status the MMS delivery status
- * @param ts the time of status change event (delivery time)
+ * @param ts delivery timestamp
  */
-GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MMSStatus status, GSM_DateTime* ts);
-
+GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MMSStatus status, time_t ts);
+GSM_Error SMSDSQL_SaveReportMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator);
 #endif
 
 /* How should editor hadle tabs in this file? Add editor commands here.

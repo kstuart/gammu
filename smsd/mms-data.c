@@ -576,7 +576,7 @@ MMSMESSAGE MMSMessage_Init()
 
 void MMSMessage_Destroy(MMSMESSAGE *message)
 {
-	if(*message == NULL) {
+	if(*message != NULL) {
 		MMSHeaders_Destroy(&(*message)->Headers);
 		MMSParts_Destroy(&(*message)->Parts);
 		if ((*message)->id)

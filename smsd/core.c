@@ -82,7 +82,6 @@
 #endif
 #endif
 
-GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms);
 GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long long inbox_id);
 GSM_Error SMSD_ProcessSMSInfoCache(GSM_SMSDConfig *Config);
 
@@ -1492,16 +1491,13 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 void SMSD_IncomingMMSSendCallback(GSM_StateMachine *s,  CSTR msgid, void *user_data)
 {
 	GSM_SMSDConfig *Config = user_data;
-	GSM_DateTime now;
 	assert(Config);
 	assert(msgid);
 
-	GSM_GetCurrentDateTime(&now);
-
-	SMSDSQL_UpdateDeliveryStatusMMS(Config, msgid, MMS_STATUS_RETRIEVED, &now);
+	SMSDSQL_UpdateDeliveryStatusMMS(Config, msgid, MMS_STATUS_RETRIEVED, time(NULL));
 }
 
-GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
+GSM_Error MMS_ProcessNotificationIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
 {
 	MMSMESSAGE mms = NULL;
 	GSM_Error error = SMSD_FetchMMS(Config, MMSIndicator);
@@ -1525,13 +1521,27 @@ GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inb
 		case M_RETRIEVE_CONF:
 			error = SaveInboxMMS(Config, mms, inbox_id);
 			break;
-		case M_DELIVERY_IND:
-			error = SaveReportMMS(Config, mms);
-			break;
 	}
 
 	MMSMessage_Destroy(&mms);
 	return error;
+}
+
+
+GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
+{
+	MMSVALUEENUM v = MMS_MessageType_FindByID(MMSIndicator->MessageType);
+	SMSD_Log(DEBUG_INFO, Config, "Received MMS Indicator: %s", v ? v->name : "<Unknown>");
+
+	switch(MMSIndicator->MessageType) {
+		default:
+			SMSD_Log(DEBUG_INFO, Config, "Unsupported MMS Indicator");
+				return ERR_NONE;
+		case M_NOTIFICATION_IND:
+			return MMS_ProcessNotificationIndicator(Config, inbox_id, MMSIndicator);
+		case M_DELIVERY_IND:
+			return SMSDSQL_SaveReportMMS(Config, MMSIndicator);
+	}
 }
 
 /**

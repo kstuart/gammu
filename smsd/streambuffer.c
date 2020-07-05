@@ -86,6 +86,11 @@ size_t SBOffset(SBUFFER buffer)
 	return buffer->offset;
 }
 
+ssize_t SB_ReadBytesAvailable(SBUFFER buffer)
+{
+	return buffer->end - buffer->offset;
+}
+
 size_t SBAvailable(SBUFFER buffer)
 {
 	if(!buffer)

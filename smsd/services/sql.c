@@ -755,7 +755,7 @@ GSM_Error SaveMMSParts(GSM_SMSDConfig *Config, unsigned long long inbox_id, MMSM
 	return  error;
 }
 
-GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MMSStatus status, GSM_DateTime ts)
+GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MMSStatus status, time_t ts)
 {
 	GSM_Error error;
 	SQL_result result;
@@ -776,7 +776,7 @@ GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MM
 		case MMS_STATUS_DEFERRED: StatusValue = "DeliveryPending"; break;
 	}
 
-	SMSDSQL_Time2String(Config, Fill_Time_T(ts), deliveryTime, 60);
+	SMSDSQL_Time2String(Config, ts, deliveryTime, 60);
 
 	SB_PutFormattedString(buf, "update sentitems set \"Status\" = '%s', \"DeliveryDateTime\" = '%s' where \"MMS_ID\" = '%s';",
 		StatusValue,
@@ -801,40 +801,15 @@ GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MM
 	return ERR_NONE;
 }
 
-GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
+GSM_Error SMSDSQL_SaveReportMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
 {
 	GSM_Error error;
 	SQL_result result;
+	char deliveryTime[60];
 	SBUFFER buf = SB_InitWithCapacity(1024);
-	MMSHEADER MessageID, To, Date, Status;
 
-	MessageID = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_MESSAGE_ID);
-	if(!MessageID) {
-		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without a message id");
-		return ERR_INVALIDDATA;
-	}
-	assert(MessageID->value.type == VT_TEXT);
-	STR txid = MessageID->value.v.str;
-
-	To = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_TO);
-	if(!To) {
-		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without the recipient address");
-		return ERR_INVALIDDATA;
-	}
-
-	Date = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_DATE);
-	if(!Date) {
-		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without the received date");
-		return ERR_INVALIDDATA;
-	}
-
-	Status = MMSMessage_FindHeader(mms, MMS_HEADER, MMS_STATUS);
-	if(!Status) {
-		SMSD_Log(DEBUG_ERROR, Config, "Received MMS delivery report without a status");
-		return ERR_INVALIDDATA;
-	}
-
-	SB_PutFormattedString(buf, "select \"ID\", \"MMSReports\" from sentitems where \"MMS_ID\" = '%s';", txid);
+	SB_PutFormattedString(buf, "select \"ID\", \"Status\", \"MMSReports\" from sentitems where \"MMS_ID\" = '%s';",
+		MMSIndicator->MessageID);
 	SB_PutByte(buf, 0);
 
 	error = SMSDSQL_Query(Config, SBBase(buf), &result);
@@ -844,24 +819,28 @@ GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 	}
 
 	if(!Config->db->NextRow(Config, &result)) {
-		SMSD_Log(DEBUG_ERROR, Config, "Received delivery report with id '%s' and no corresponding entry in sentitems", txid);
+		SMSD_Log(DEBUG_INFO, Config, "Received MMS delivery report but the Message-ID(%s) is not recognized.",
+			MMSIndicator->MessageID);
 		Config->db->FreeResult(Config, &result);
 		SB_Destroy(&buf);
 		return ERR_INVALIDDATA;
 	}
 
 	CSTR sent_id = Config->db->GetString(Config, &result, 0);
-	CSTR reports = Config->db->GetString(Config, &result, 1);
+	CSTR old_status = Config->db->GetString(Config, &result, 1);
+	CSTR reports = Config->db->GetString(Config, &result, 2);
+	int hasDeliveryFailures = strcmp(old_status, "DeliveryFailed") == 0;
+
+	MMSVALUEENUM status = MMS_StatusValue_FindByID(MMSIndicator->Status);
+	SMSDSQL_Time2String(Config, MMSIndicator->Date, deliveryTime, 60);
 
 	SB_Clear(buf);
-	SB_PutFormattedString(buf, "update sentitems set \"Status\" = 'SendingOK', \"MMSReports\" = '%sTo ", reports);
-	MMSValue_AsString(buf, &To->value);
-	SB_PutString(buf, " on ");
-	MMSValue_AsString(buf, &Date->value);
-	SB_PutString(buf, " Status: ");
-	MMSValue_AsString(buf, &Status->value);
-	SB_PutString(buf, "\n");
-	SB_PutFormattedString(buf, "' where \"ID\" = '%s';", sent_id);
+	SB_PutFormattedString(buf, "update sentitems set \"MMSReports\" = '%sTo %s On %s Status: %s\n' where \"ID\" = '%s';",
+	  reports,
+	  MMSIndicator->Recipient,
+	  deliveryTime,
+	  status ? status->name : "<unknown>",
+	  sent_id);
 	SB_PutByte(buf, 0);
 	Config->db->FreeResult(Config, &result);
 
@@ -871,6 +850,12 @@ GSM_Error SaveReportMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms)
 
 	Config->db->FreeResult(Config, &result);
 	SB_Destroy(&buf);
+
+	if(error == ERR_NONE)
+		error = SMSDSQL_UpdateDeliveryStatusMMS(Config, MMSIndicator->MessageID,
+			 hasDeliveryFailures ? MMS_STATUS_REJECTED : MMSIndicator->Status,
+			 MMSIndicator->Date);
+
 	return error;
 }
 
@@ -1606,7 +1591,7 @@ GSM_Error SMSDSQL_AddSentMMSInfo(GSM_SMSDConfig *Config, CSTR Coding, CSTR TextD
 	if(sendStatus) {
 		SMSD_Log(DEBUG_NOTICE, Config, "MMS SendStatus: %s",	sendStatus->value.v.enum_v->name);
 		if(sendStatus->value.v.enum_v->code != MMS_RESP_OK)
-			statusText = "Error";// sendStatus->value.v.enum_v->name;
+			statusText = "Error";
 	}
 
 	SB_PutFormattedString(buf, "update sentitems set \"StatusCode\" = %d, \"MMS_ID\" = '", Config->StatusCode);

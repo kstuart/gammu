@@ -10,7 +10,7 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
+#include <stdint.h>
 #include <gammu-limits.h>
 #include <gammu-memory.h>
 #include <gammu-datetime.h>
@@ -83,7 +83,15 @@ typedef enum {
  *
  * \ingroup MMS
  */
+#define MAX_MMS_MESSAGEID_LEN 160
+#define MAX_MMS_ADDRESS_LEN 200
+#define MAX_MMS_STATUS_TEXT_LEN 200
+
 typedef struct {
+	/**
+	 * Message type
+	 */
+	unsigned char MessageType;
 	/**
 	 * Message address (URL for download).
 	 */
@@ -104,6 +112,14 @@ typedef struct {
 	 * Class of a message.
 	 */
 	GSM_MMS_Class Class;
+	/**
+	 * m-delivery-ind message fields
+	 */
+	char MessageID[MAX_MMS_MESSAGEID_LEN+1];
+	char Recipient[MAX_MMS_ADDRESS_LEN+1];
+	char StatusText[MAX_MMS_STATUS_TEXT_LEN+1];
+	time_t Date;
+	uint8_t Status;
 } GSM_MMSIndicator;
 
 /**

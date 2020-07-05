@@ -42,6 +42,7 @@ ssize_t SB_Copy(SBUFFER buffer, size_t offset, const void *src, size_t count);
 ssize_t SB_CopyUntil(SBUFFER buffer, void *dst, unsigned char ch);
 ssize_t SB_Seek(SBUFFER buffer, long offset, int origin);
 ssize_t SB_FindNext(SBUFFER buffer, unsigned char ch);
+ssize_t SB_ReadBytesAvailable(SBUFFER buffer);
 
 int SB_PutByte(SBUFFER buffer, unsigned char byte);
 ssize_t SB_PutBytes(SBUFFER buffer, const void *src, size_t nbytes);

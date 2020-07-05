@@ -12,13 +12,15 @@ size_t MMS_DecodeUintVar(SBUFFER stream)
 {
 	size_t uint = 0;
 	uint8_t byte = SB_NextByte(stream);
-	while(byte >> 7u) {
+	if(byte) {
+		while (byte >> 7u) {
+			uint <<= 7u;
+			uint |= byte & 0x7fu;
+			byte = SB_NextByte(stream);
+		}
 		uint <<= 7u;
 		uint |= byte & 0x7fu;
-		byte = SB_NextByte(stream);
 	}
-	uint <<= 7u;
-	uint |= byte & 0x7fu;
 
 	return uint;
 }
@@ -168,7 +170,7 @@ MMSError MMS_DecodeText(SBUFFER stream, MMSVALUE out)
 	return MMS_DecodeQuoteText(stream, out);
 }
 
-// Encoded-string-value = Text -string | Value-length Char-set Text -string
+// Encoded-string-value = Text-string | Value-length Char-set Text-string
 MMSError MMS_DecodeEncodedText(SBUFFER stream, MMSVALUE out)
 {
 	MMSError error = MMS_DecodeText(stream, out);

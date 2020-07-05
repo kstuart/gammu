@@ -40,7 +40,7 @@ int MMS_MapEncodedHeaders(SBUFFER stream, MMSHEADERS headers)
 	MMSFIELDINFO fi = NULL;
 	MMSFieldKind kind = MMS_HEADER;
 
-	while(MMS_DecodeShortInteger(stream, &fid) == MMS_ERR_NONE) {
+	while(SB_ReadBytesAvailable(stream) && MMS_DecodeShortInteger(stream, &fid) == MMS_ERR_NONE) {
 		fi = MMSFields_FindByID(fid.v.short_int);
 		if(!fi) {
 			fi = WSPFields_FindByID(fid.v.short_int);
@@ -143,10 +143,12 @@ MMSError MMS_MapEncodedMessage(GSM_SMSDConfig *Config, SBUFFER Stream, MMSMESSAG
 
 	m->Version = h->value.v.short_int;
 
-	error = MMS_MapEncodedParts(Stream, m->Parts);
-	if(error != MMS_ERR_NONE) {
-		MMSMessage_Destroy(&m);
-		return error;
+	if(SB_ReadBytesAvailable(Stream)) {
+		error = MMS_MapEncodedParts(Stream, m->Parts);
+		if (error != MMS_ERR_NONE) {
+			MMSMessage_Destroy(&m);
+			return error;
+		}
 	}
 
 	*out = m;

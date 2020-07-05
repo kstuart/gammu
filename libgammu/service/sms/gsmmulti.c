@@ -1,6 +1,7 @@
 /* (c) 2002-2006 by Marcin Wiacek */
 
 #include <ctype.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 
@@ -983,6 +984,24 @@ void GSM_FreeMultiPartSMSInfo(GSM_MultiPartSMSInfo *Info)
 	}
 }
 
+ssize_t DecodeInteger(const unsigned char *buffer, uint32_t *integer)
+{
+	uint32_t n = 0;
+	ssize_t len = *buffer;
+	if(len > 30)
+		return -1;
+
+	buffer++;
+
+	for(int i = 0; i < len; i++) {
+		n <<= 8u;
+		n |= *(buffer++);
+	}
+
+	*integer = n;
+	return len;
+}
+
 /**
  * Decodes long MMS notification SMS.
  */
@@ -990,7 +1009,7 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 			    GSM_MultiPartSMSInfo	*Info,
 			    GSM_MultiSMSMessage		*SMS)
 {
-	int i, Length = 0, j;
+	ssize_t i, j, Length = 0;
 	unsigned char Buffer[GSM_MAX_SMS_LENGTH*2*GSM_MAX_MULTI_SMS];
 
 	/* Concatenate data */
@@ -1007,7 +1026,7 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 		Length = Length + SMS->SMS[i].Length;
 	}
 
-	dbgprintf(di, "MMS data of length %d:\n", Length);
+	dbgprintf(di, "MMS data of length %zd:\n", Length);
 	DumpMessage(di, Buffer, Length);
 	Info->Entries[0].MMSIndicator = (GSM_MMSIndicator *)malloc(sizeof(GSM_MMSIndicator));
 	if (Info->Entries[0].MMSIndicator == NULL) {
@@ -1015,11 +1034,18 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 	}
 	Info->EntriesNum    = 1;
 	Info->Entries[0].ID = SMS_MMSIndicatorLong;
+	Info->Entries[0].MMSIndicator->MessageType = 0;
 	Info->Entries[0].MMSIndicator->Class = GSM_MMS_None;
 	Info->Entries[0].MMSIndicator->MessageSize = 0;
 	Info->Entries[0].MMSIndicator->Title[0] = 0;
 	Info->Entries[0].MMSIndicator->Sender[0] = 0;
 	Info->Entries[0].MMSIndicator->Address[0] = 0;
+
+	/* primarily for m-delivery-ind */
+	Info->Entries[0].MMSIndicator->MessageID[0] = 0;
+	Info->Entries[0].MMSIndicator->Recipient[0] = 0;
+	Info->Entries[0].MMSIndicator->Status = 0;
+	Info->Entries[0].MMSIndicator->Date = 0;
 
 	/* First byte is the WSP transaction ID */
 	/* Second byte is PUSH */
@@ -1027,18 +1053,6 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 		dbgprintf(di, "Unsupported WSP PDU type: 0x%02x\n", Buffer[1]);
 		return FALSE;
 	}
-
-//	int offset = Buffer[2] + 3;
-//	SBUFFER stream = SB_MapBuffer(&Buffer[offset], Length - offset);
-//	MMSHEADERS headers = MMSHeaders_InitWithCapacity(14);
-//	MMSError merr = MMS_MapEncodedHeaders(stream, headers);
-//	assert(merr == MMS_ERR_NONE);
-//	SBUFFER b = SB_InitWithCapacity(4096);
-//	MMS_DumpHeaders(b, headers);
-//	SB_PutByte(b, 0);
-//	dbgprintf(di, "MMS PDU Headers\n%s\n", SBBase(b));
-//	MMSHeaders_Destroy(&headers);
-//	SB_Destroy(&b);
 
 	/*
 	 * WSP Push PDU follows:
@@ -1054,11 +1068,12 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 			case 0x8c:
 				/* X-Mms-Message-Type (Transaction type) */
 				i++;
-				/* We support only m-notification-ind (130) */
-				if (Buffer[i] != 0x82) {
+				/* We support only m-notification-ind (130) and m-delivery-ind (134) */
+				if(Buffer[i] != 130 && Buffer[i] != 134) {
 					dbgprintf(di, "Unsupported transaction type: 0x%02x\n", Buffer[i]);
 					return FALSE;
 				}
+				Info->Entries[0].MMSIndicator->MessageType = Buffer[i];
 				break;
 			case 0x98:
 				/* X-Mms-Transaction-Id (Message ID) */
@@ -1135,7 +1150,31 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 				i += strlen(Info->Entries[0].MMSIndicator->Address) + 1;
 				break;
 
-			/* Ignored variable length fields */
+			case 0x8b: /* Message-ID */
+				/* NOTE: only supports unquoted text */
+				i++;
+				if (Buffer[i] == 0) continue;
+				strncpy(Info->Entries[0].MMSIndicator->MessageID, Buffer + i, MAX_MMS_MESSAGEID_LEN);
+				while(Buffer[i] && i < Length) i++;
+				break;
+			case 0x85: /* Date */
+				i++;
+				i += DecodeInteger(&Buffer[i], (uint32_t*)&Info->Entries[0].MMSIndicator->Date);
+				break;
+			case 0x95: /* X-Mms-Status */
+				i++;
+				Info->Entries[0].MMSIndicator->Status = Buffer[i];
+				break;
+			case 0x97: /* To (Recipient)*/
+				/* NOTE: only supports unquoted text */
+				i++;
+				if (Buffer[i] == 0) continue;
+				strncpy(Info->Entries[0].MMSIndicator->Recipient, Buffer + i, MAX_MMS_ADDRESS_LEN);
+				while(Buffer[i] && i < Length) i++;
+				break;
+
+
+				/* Ignored variable length fields */
 			case 0x87: /* X-Mms-Delivery-Time */
 			case 0x88: /* X-Mms-Expiry */
 			case 0x9d: /* X-Mms-Reply-Charging-Deadline */
@@ -1145,12 +1184,8 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 			case 0xaa: /* X-Mms-Mbox-Totals */
 			case 0xac: /* X-Mms-Mbox-Quotas */
 			case 0xb2: /* X-Mms-Element-Descriptor */
-				i++;
-				i += Buffer[i];
-				break;
 
 			/* Ignored long integer types */
-			case 0x85: /* Date */
 			case 0x9f: /* X-Mms-Reply-Charging-Size */
 				i++;
 				i += Buffer[i];
@@ -1160,8 +1195,6 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 			case 0xad: /* X-Mms-Message-Count */
 			case 0xaf: /* X-Mms-Start */
 			case 0xb3: /* X-Mms-Limit */
-				i++;
-				break;
 
 			/* Ignored octet types */
 			case 0x86: /* X-Mms-Delivery-Report */
@@ -1170,7 +1203,6 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 			case 0x91: /* X-Mms-Report-Allowed */
 			case 0x92: /* X-Mms-Response-Status */
 			case 0x94: /* X-Mms-Sender-Visibility */
-			case 0x95: /* X-Mms-Status */
 			case 0x99: /* X-Mms-Retrieve-Status */
 			case 0x9b: /* X-Mms-Read-Status */
 			case 0x9c: /* X-Mms-Reply-Charging */
@@ -1194,7 +1226,6 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 			case 0x81: /* Bcc */
 			case 0x82: /* Cc */
 			case 0x84: /* Content-Type */
-			case 0x97: /* To */
 			case 0x93: /* X-Mms-Response-Text */
 			case 0x9a: /* X-Mms-Retrieve-Text */
 			case 0xa6: /* X-Mms-Store-Status-Text */
@@ -1206,7 +1237,6 @@ gboolean GSM_DecodeMMSIndication(GSM_Debug_Info *di,
 				break;
 
 			/* Ignored string types */
-			case 0x8b: /* Message-ID */
 			case 0x9e: /* X-Mms-Reply-Charging-ID */
 			case 0xb7: /* X-Mms-Applic-ID */
 			case 0xb8: /* X-Mms-Reply-Applic-ID */
