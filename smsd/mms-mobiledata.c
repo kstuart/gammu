@@ -229,7 +229,6 @@ GSM_Error SendMMS(GSM_SMSDConfig *Config, SBUFFER Buffer)
 		SMSD_ProcessServerResponse(Config, RespBuffer);
 	}
 
-	SB_Destroy(&RespBuffer);
 	return error;
 }
 

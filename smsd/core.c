@@ -547,6 +547,11 @@ void SMSD_FreeConfig(GSM_SMSDConfig *Config)
 	GSM_StringArray_Free(&(Config->ExcludeSMSCList));
 
 	SB_Destroy(&Config->MMSBuffer);
+	if(Config->MMSSendInfo.sendConf)
+		MMSMessage_Destroy(&Config->MMSSendInfo.sendConf);
+
+	if(Config->MMSSendInfo.sendConfBuffer)
+		SB_Destroy(&Config->MMSSendInfo.sendConfBuffer);
 
 	free(Config->gammu_log_buffer);
 
