@@ -778,7 +778,7 @@ GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MM
 
 	SMSDSQL_Time2String(Config, ts, deliveryTime, 60);
 
-	SB_PutFormattedString(buf, "update sentitems set \"Status\" = '%s', \"DeliveryDateTime\" = '%s' where \"MMS_ID\" = '%s';",
+	SB_PutFormattedString(buf, "update sentitems set \"Status\" = '%s', \"DeliveryDateTime\" = '%s' where \"MMS_ID\" LIKE '%s%%';",
 		StatusValue,
 		deliveryTime,
 		msgid);
@@ -1181,7 +1181,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 	MMSMessage_SetTransactionID(m, txid);
 	MMSMessage_SetMessageVersion(m, MMS_VERSION_12);
 
-	if(strcasecmp("no", Config->deliveryreport) != 0)
+	if(Config->currdeliveryreport == 1)
 		MMSMessage_SetDeliveryReport(m, MMS_YESNO_YES);
 
 	EncodedString es;
@@ -1418,6 +1418,11 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			CopyUnicodeString(sms->SMS[sms->Number].Number, sms->SMS[0].Number);
 		}
 
+		Config->currdeliveryreport = db->GetBool(Config, &res, 9);
+		if(Config->currdeliveryreport == -1 && strcmp(Config->deliveryreport, "no") != 0)
+			Config->currdeliveryreport = 1;
+
+		sms->SMS[sms->Number].PDU = Config->currdeliveryreport == 1 ? SMS_Status_Report : SMS_Submit;
 
 		if(i == 1 &&  Class == GSM_CLASS_MMS) {
 			mms_headers = db->GetString(Config, &res, 14);
@@ -1441,7 +1446,6 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			}
 		}
 
-		sms->SMS[sms->Number].PDU = SMS_Submit;
 		sms->Number++;
 
 		if (i == 1) {
@@ -1449,7 +1453,6 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			last = !db->GetBool(Config, &res, 7);
 			Config->relativevalidity = (int)db->GetNumber(Config, &res, 8);
 
-			Config->currdeliveryreport = db->GetBool(Config, &res, 9);
 			strncpy(Config->CreatorID, db->GetString(Config, &res, 10), sizeof(Config->CreatorID));
 			Config->CreatorID[sizeof(Config->CreatorID) - 1] = 0;
 			Config->retries = (int)db->GetNumber(Config, &res, 11);
