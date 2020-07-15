@@ -176,7 +176,7 @@ static GSM_Error CURL_PostToURL(GSM_SMSDConfig *Config, SBUFFER Buffer, SBUFFER 
 		SMSD_Log(DEBUG_ERROR, Config, "Failed to post MMS to server: %s", curl_easy_strerror(cr));
 
 	curl_easy_getinfo(ch, CURLINFO_RESPONSE_CODE, &http_code);
-	Config->StatusCode = (int)http_code;
+	Config->StatusCode = http_code == 200 ? -1 : (int)http_code;
 
 	/* cleanup curl stuff */
 	curl_easy_cleanup(ch);
