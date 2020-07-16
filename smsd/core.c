@@ -1446,7 +1446,6 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 {
 	assert(RespBuffer);
 	MMSError error;
-	GSM_Error gerr = ERR_NONE;
 
 #ifdef DEBUG
 	char fname[] = "/tmp/GSvrResp_XXXXXX";
@@ -1461,35 +1460,48 @@ GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer)
 
 	if(SB_PeekByte(RespBuffer) != 0x8c) {
 		SMSD_Log(DEBUG_NOTICE, Config, "Server Response: %s", SBBase(RespBuffer));
+		SB_Destroy(&RespBuffer);
 		return ERR_NONE;
 	}
 
-	MMSMESSAGE *m = &Config->MMSSendInfo.sendConf;
-	if(*m) {
-		MMSMessage_Destroy(m);
-		SB_Destroy(&Config->MMSSendInfo.sendConfBuffer);
+	MMSSENDINFO si = &Config->MMSSendInfo;
+	if(si->sendConf) {
+#ifdef DEBUG
+		SMSD_Log(DEBUG_NOTICE, Config, "Destroying SendConf message");
+#endif
+		MMSMessage_Destroy(&si->sendConf);
 	}
 
-	error = MMS_MapEncodedMessage(Config, RespBuffer, m);
+	if(si->sendConfBuffer) {
+#ifdef DEBUG
+		SMSD_Log(DEBUG_NOTICE, Config, "Destroying SendConf buffer");
+#endif
+		SB_Destroy(&si->sendConfBuffer);
+	}
+
+	error = MMS_MapEncodedMessage(Config, RespBuffer, &si->sendConf);
 	if(error != MMS_ERR_NONE) {
 		SMSD_Log(DEBUG_NOTICE, Config, "Could not map server response.");
+		SB_Destroy(&RespBuffer);
 		return ERR_NONE;
 	}
 
-	if((*m)->MessageType->code != M_SEND_CONF) {
-		SMSD_Log(DEBUG_INFO, Config, "Unexpected response, expected m-send-conf message but got %s", (*m)->MessageType->name);
-		MMSMessage_Destroy(m);
+	si->sendConfBuffer = RespBuffer;
+	
+	if(si->sendConf->MessageType->code != M_SEND_CONF) {
+		SMSD_Log(DEBUG_INFO, Config, "Unexpected response, expected m-send-conf message but got %s", si->sendConf->MessageType->name);
+		MMSMessage_Destroy(&si->sendConf);
+		SB_Destroy(&si->sendConfBuffer);
 		return ERR_NONE;
 	}
 
-	Config->MMSSendInfo.sendConfBuffer = RespBuffer;
-
+#ifdef DEBUG
 	SBUFFER out = SB_Init();
-	MMS_DumpHeaders(out, (*m)->Headers);
+	MMS_DumpHeaders(out, si->sendConf->Headers);
 	SB_PutByte(out, 0);
 	SMSD_Log(DEBUG_NOTICE, Config, "Server Response:\n%s", SBBase(out));
 	SB_Destroy(&out);
-
+#endif
 	return ERR_NONE;
 }
 
