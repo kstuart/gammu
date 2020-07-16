@@ -295,6 +295,7 @@ bool MMSHeader_SameHeader(MMSHEADER l, MMSHEADER r);
 MMSError MMSHeader_AsString(SBUFFER stream, MMSHEADER header);
 
 MMSHEADERS MMSHeaders_InitWithCapacity(int num_headers);
+MMSError MMSHeaders_Clear(MMSHEADERS headers);
 void MMSHeaders_Destroy(MMSHEADERS *headers);
 MMSHEADER MMSHeaders_NewHeader(MMSHEADERS headers);
 int MMSHeaders_GrowNumEntries(MMSHEADERS headers, int delta);
@@ -304,6 +305,7 @@ MMSError MMSHeaders_Remove(MMSHEADERS headers, MMSHEADER header);
 
 int MMSParts_GrowNumEntries(MMSPARTS parts, int delta);
 MMSPARTS MMSParts_InitWithCapacity(int num_parts);
+MMSError MMSParts_Clear(MMSPARTS parts);
 void MMSParts_Destroy(MMSPARTS *parts);
 MMSPART MMSParts_NewPart(MMSPARTS parts);
 MMSPART MMS_CreatePart(SBUFFER stream, MMSPARTS parts);
@@ -311,6 +313,7 @@ MMSPART MMS_CreatePart(SBUFFER stream, MMSPARTS parts);
 void MMSPart_Destroy(MMSPART *part);
 
 MMSMESSAGE MMSMessage_Init(void);
+MMSError MMSMessage_Clear(MMSMESSAGE message);
 void MMSMessage_Destroy(MMSMESSAGE *message);
 MMSError MMSMessage_SetID(MMSMESSAGE message, CSTR id);
 MMSHEADER MMSMessage_FindHeader(MMSMESSAGE m, MMSFieldKind kind, int id);

@@ -1624,11 +1624,6 @@ GSM_Error SMSDSQL_AddSentMMSInfo(GSM_SMSDConfig *Config, CSTR Coding, CSTR TextD
 	Config->MMSSendInfo.outboxID = -1;
 	Config->MMSSendInfo.mmsTxID = -1;
 
-	if(sendConf) {
-		MMSMessage_Destroy(&sendConf);
-		SB_Destroy(&Config->MMSSendInfo.sendConfBuffer);
-	}
-
 	return error;
 }
 

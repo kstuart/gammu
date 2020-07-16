@@ -419,6 +419,19 @@ MMSHEADERS MMSHeaders_InitWithCapacity(int num_headers)
 	return headers;
 }
 
+MMSError MMSHeaders_Clear(MMSHEADERS headers)
+{
+	assert(headers);
+
+	size_t pos = 0;
+	while(pos < headers->end)
+		MMSHeader_Clear(&headers->entries[pos]);
+
+	headers->end = 0;
+	return MMS_ERR_NONE;
+}
+
+
 void MMSHeaders_Destroy(MMSHEADERS *headers)
 {
 	if(!*headers)
@@ -520,17 +533,27 @@ MMSPARTS MMSParts_InitWithCapacity(int num_parts)
 	return parts;
 }
 
+MMSError MMSParts_Clear(MMSPARTS parts)
+{
+	assert(parts);
+	
+	MMSPART part;
+	for(size_t i = 0; i < parts->end; i++) {
+		part = &parts->entries[i];
+		MMSPart_Destroy(&part);
+	}
+
+	parts->end = 0;
+	
+	return MMS_ERR_NONE;
+}
+
 void MMSParts_Destroy(MMSPARTS *parts)
 {
 	if(!*parts)
 		return;
 
-	MMSPART part;
-	for(size_t i =0; i < (*parts)->end; i++) {
-		part = &(*parts)->entries[i];
-		MMSPart_Destroy(&part);
-	}
-
+	MMSParts_Clear(*parts);
 	free((*parts)->entries);
 	free(*parts);
 	*parts = NULL;
@@ -572,6 +595,18 @@ MMSMESSAGE MMSMessage_Init()
 	}
 
 	return msg;
+}
+
+MMSError MMSMessage_Clear(MMSMESSAGE message)
+{
+	assert(message);
+	MMSHeaders_Clear(message->Headers);
+
+	message->MessageType = NULL;
+	message->id = NULL;
+	message->Version = 0;
+	
+	return MMS_ERR_NONE;
 }
 
 void MMSMessage_Destroy(MMSMESSAGE *message)
