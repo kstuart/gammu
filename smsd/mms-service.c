@@ -221,7 +221,12 @@ LocalTXID MMS_CreateTransactionID(void)
 {
 	LocalTXID txid;
 	int fd = open("/dev/urandom", O_RDONLY);
+	if(fd == -1)
+		return -1;
+
 	size_t bytes_read = read(fd, &txid, sizeof(LocalTXID));
+	close(fd);
+
 	if(bytes_read != sizeof(LocalTXID))
 		return -1;
 
