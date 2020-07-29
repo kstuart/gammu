@@ -68,12 +68,14 @@ void set_echo(unsigned const char *buf, const size_t len)
 
 ssize_t _ResponseReadDevice(GSM_StateMachine *s UNUSED, void *buf, size_t nbytes)
 {
+  GSM_Phone *Phone = &_response_queue.stateMachine->Phone;
+  GSM_Phone_ATGENData *Priv = &Phone->Data.Priv.ATGEN;
   size_t read_len = 0;
 
-  if(_response_queue.stateMachine->Phone.Data.SentMsg == NULL)
+  if(Phone->Data.SentMsg == NULL && Priv->ReplyState != AT_Reply_SMSEdit)
     return 0;
 
-  if(_echo_buffer.echoed == FALSE && _echo_buffer.echo_len > 0) {
+  if(_echo_buffer.echoed == FALSE && _echo_buffer.echo_len > 0) { //} && _echo_buffer.echo[0] != 0x1A) {
     read_len = _echo_buffer.echo_len;
     if(read_len > nbytes) {
       // shouldn't happen in current design, so truncate for now.
@@ -107,15 +109,18 @@ GSM_Error _ResponseWriteMessage(GSM_StateMachine *s UNUSED, unsigned const char 
   return ERR_NONE;
 }
 
+GSM_Debug_Info *set_debug_info(void)
+{
+  GSM_Debug_Info *di = GSM_GetGlobalDebug();
+  GSM_SetDebugFileDescriptor(stderr, FALSE, di);
+  GSM_SetDebugLevel("textall", di);
+  return di;
+}
+
 GSM_StateMachine* setup_state_machine(void)
 {
-  GSM_Debug_Info *debug_info;
+  GSM_Debug_Info *debug_info = set_debug_info();
   GSM_StateMachine *s;
-
-  /* Configure state machine */
-  debug_info = GSM_GetGlobalDebug();
-  GSM_SetDebugFileDescriptor(stderr, FALSE, debug_info);
-  GSM_SetDebugLevel("textall", debug_info);
 
   /* Allocates state machine */
   s = GSM_AllocStateMachine();

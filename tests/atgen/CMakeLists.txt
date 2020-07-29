@@ -26,6 +26,7 @@ MACRO(smsd_test TEST_NAME)
 ENDMACRO(smsd_test)
 
 configure_file(smsd.cfg.in ${PROJECT_BINARY_DIR}/smsd.cfg)
+configure_file(smsd-cdma.cfg.in ${PROJECT_BINARY_DIR}/smsd-cdma.cfg)
 
 add_custom_command(TARGET atgen-tests POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/inbox
@@ -53,3 +54,7 @@ smsd_test(smsd-incoming-cds)
 smsd_test(smsd-cancel-call)
 smsd_test(smsd-incoming-ussd)
 smsd_test(smsd-1-folder-getnextsms)
+
+atgen_test(at-cdma-pdu-encoder)
+atgen_test(at-cdma-pdu-decoder)
+atgen_test(at-cdma-multipart-ascii)

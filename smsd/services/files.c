@@ -157,6 +157,7 @@ static GSM_Error SMSDFiles_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 				switch (sms->SMS[i].Coding) {
 					case SMS_Coding_Unicode_No_Compression:
 					case SMS_Coding_Default_No_Compression:
+          case SMS_Coding_ASCII:
 						DecodeUnicode(sms->SMS[i].Text, buffer2);
 						if (strcasecmp(Config->inboxformat, "unicode") == 0) {
 							buffer[0] = 0xFE;
@@ -645,6 +646,7 @@ static GSM_Error SMSDFiles_CreateOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDCo
 			switch (sms->SMS[i].Coding) {
 				case SMS_Coding_Unicode_No_Compression:
 				case SMS_Coding_Default_No_Compression:
+				case SMS_Coding_ASCII:
 					if (strcasecmp(Config->outboxformat, "unicode") == 0) {
 						buffer[0] = 0xFE;
 						buffer[1] = 0xFF;

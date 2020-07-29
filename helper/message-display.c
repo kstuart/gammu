@@ -273,6 +273,9 @@ void DisplaySingleSMSInfo(GSM_SMSMessage *sms, gboolean displaytext, gboolean di
 				/* l10n: 8-bit message coding */
 				printf("%s", _("8-bit"));
 				break;
+			case SMS_Coding_ASCII			:
+				printf("%s", _("ASCII"));
+				break;
 		}
 		printf("\n");
 		if (sms->State==SMS_UnSent && sms->Memory==MEM_ME) {

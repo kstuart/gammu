@@ -47,6 +47,8 @@ GSM_Error ALCATEL_ProtocolVersionReply (GSM_Protocol_Message *, GSM_StateMachine
 
 #ifdef GSM_ENABLE_ATOBEX
 #include "../atobex/atobexfunc.h"
+#include "../../cdma.h"
+
 #endif
 
 
@@ -2386,6 +2388,13 @@ GSM_Error ATGEN_Initialise(GSM_StateMachine *s)
 
   /* can we use CHUP to hangup calls (otherwise use ATH) */
   ATGEN_WaitForAutoLen(s, "AT+CHUP=?\r", 0x00, 40, ID_CheckCHUP);
+
+  if(s->CurrentConfig->NetworkType == NETWORK_AUTO) {
+    // TODO: [KS] when not determined by configuration then set according to reported network,
+    //  maybe move to ATGEN_GetNetworkInfo
+  }
+
+	smprintf(s, "Network type: %s\n", NetworkTypeToString(s->CurrentConfig->NetworkType));
 
 	s->Protocol.Data.AT.FastWrite = !GSM_IsPhoneFeatureAvailable(s->Phone.Data.ModelInfo, F_SLOWWRITE);
 	s->Protocol.Data.AT.CPINNoOK = GSM_IsPhoneFeatureAvailable(s->Phone.Data.ModelInfo, F_CPIN_NO_OK);

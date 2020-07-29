@@ -28,6 +28,7 @@
 #endif
 
 #include "../core.h"
+#include "../../libgammu/gsmstate.h"
 #include "../../libgammu/misc/string.h"
 
 /**
@@ -449,6 +450,7 @@ static GSM_Error SMSDSQL_NamedQuery(GSM_SMSDConfig * Config, const char *sql_que
 							switch (sms->Coding) {
 								case SMS_Coding_Unicode_No_Compression:
 								case SMS_Coding_Default_No_Compression:
+								case SMS_Coding_ASCII:
 									EncodeHexUnicode(static_buff, sms->Text, UnicodeLength(sms->Text));
 									break;
 								case SMS_Coding_8bit:
@@ -498,6 +500,8 @@ static GSM_Error SMSDSQL_NamedQuery(GSM_SMSDConfig * Config, const char *sql_que
 								       switch (sms->Coding) {
 									       case SMS_Coding_Unicode_No_Compression:
 									       case SMS_Coding_Default_No_Compression:
+									       case SMS_Coding_ASCII:
+									       case SMS_Coding_8bit:
 										       EncodeUTF8(static_buff, sms->Text);
 										       to_print = static_buff;
 										       break;
@@ -1022,7 +1026,6 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		}
 
 		text = db->GetString(Config, &res, 0);
-		coding = db->GetString(Config, &res, 1);
 		if (text == NULL) {
 			text_len = 0;
 		} else {
@@ -1040,11 +1043,18 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		/* ID, we don't need it, but some ODBC backend need to fetch all values */
 		db->GetNumber(Config, &res, 5);
 
-		sms->SMS[sms->Number].Coding = GSM_StringToSMSCoding(coding);
+    coding = db->GetString(Config, &res, 1);
+		if(coding && strncasecmp("network_default", coding, 15) == 0) {
+      sms->SMS[sms->Number].Coding = GSM_NetworkDefaultCoding(Config->gsm->CurrentConfig);
+    }
+		else {
+      sms->SMS[sms->Number].Coding = GSM_StringToSMSCoding(coding);
+    }
+
 		if (sms->SMS[sms->Number].Coding == 0) {
 			if (text == NULL || text_len == 0) {
 				SMSD_Log(DEBUG_NOTICE, Config, "Assuming default coding for text message");
-				sms->SMS[sms->Number].Coding = SMS_Coding_Default_No_Compression;
+				sms->SMS[sms->Number].Coding = GSM_NetworkDefaultCoding(Config->gsm->CurrentConfig);
 			} else {
 				SMSD_Log(DEBUG_NOTICE, Config, "Assuming 8bit coding for binary message");
 				sms->SMS[sms->Number].Coding = SMS_Coding_8bit;
@@ -1062,8 +1072,8 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 		} else {
 			switch (sms->SMS[sms->Number].Coding) {
 				case SMS_Coding_Unicode_No_Compression:
-
 				case SMS_Coding_Default_No_Compression:
+        case SMS_Coding_ASCII:
 					if (! DecodeHexUnicode(sms->SMS[sms->Number].Text, text, text_len)) {
 						SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
 						return ERR_UNKNOWN;
@@ -1096,12 +1106,12 @@ static GSM_Error SMSDSQL_FindOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig
 
 		sms->SMS[sms->Number].UDH.Type = UDH_NoUDH;
 		if (udh != NULL && udh_len != 0) {
-			sms->SMS[sms->Number].UDH.Type = UDH_UserUDH;
 			sms->SMS[sms->Number].UDH.Length = udh_len / 2;
 			if (! DecodeHexBin(sms->SMS[sms->Number].UDH.Text, udh, udh_len)) {
 				SMSD_Log(DEBUG_ERROR, Config, "Failed to decode UDH HEX string: %s", udh);
 				return ERR_UNKNOWN;
 			}
+			GSM_DecodeUDHHeader(GSM_GetDI(Config->gsm), &sms->SMS[sms->Number].UDH);
 		}
 
 		sms->SMS[sms->Number].PDU = SMS_Submit;
@@ -1157,7 +1167,7 @@ static GSM_Error SMSDSQL_MoveSMS(GSM_MultiSMSMessage * sms UNUSED, GSM_SMSDConfi
 }
 
 /* Adds SMS to Outbox */
-static GSM_Error SMSDSQL_CreateOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *NewID)
+GSM_Error SMSDSQL_CreateOutboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig * Config, char *NewID)
 {
 	char creator[200];
 	int i;

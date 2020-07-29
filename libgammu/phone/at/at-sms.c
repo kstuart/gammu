@@ -30,6 +30,7 @@
 #include "../../gsmphones.h"
 #include "../../misc/coding/coding.h"
 #include "../../service/gsmpbk.h"
+#include "../../cdma.h"
 #include "../pfunc.h"
 
 #include "atgen.h"
@@ -219,8 +220,6 @@ GSM_Error ATGEN_GetSMSMemories(GSM_StateMachine *s)
 		Priv->SIMSaveSMS = AT_NOTAVAILABLE;
 	}
 
-	// count standard folders
-	Priv->NumFolders = 0;
 	if(ATGEN_IsMemoryAvailable(Priv, MEM_SM))
 	  Priv->NumFolders++;
 
@@ -577,7 +576,13 @@ GSM_Error ATGEN_DecodePDUMessage(GSM_StateMachine *s, const char *PDU, const int
 	}
 
 	/* Decode PDU */
-	error = GSM_DecodePDUFrame(&(s->di), sms,  buffer, length, &parse_len, TRUE);
+	switch (s->CurrentConfig->NetworkType) {
+    case NETWORK_CDMA:
+      error = ATCDMA_DecodePDUFrame(&(s->di), sms,  buffer, length, &parse_len);
+      break;
+    default:
+      error = GSM_DecodePDUFrame(&(s->di), sms,  buffer, length, &parse_len, TRUE);
+	}
 
 	if (error != ERR_NONE) {
 		free(buffer);
@@ -1729,9 +1734,19 @@ GSM_Error ATGEN_MakeSMSFrame(GSM_StateMachine *s, GSM_SMSMessage *message, unsig
 			smprintf(s, "SMS Submit\n");
 			error = PHONE_EncodeSMSFrame(s,message,buffer,PHONE_SMSSubmit,&length,TRUE);
 
-			if (error != ERR_NONE) {
+			if (error != ERR_NONE)
+			  return error;
+
+		  if(s->CurrentConfig->NetworkType == NETWORK_CDMA) {
+		    EncodeHexBin(hexreq, buffer, length);
+		    *length2 = length * 2;
+		    *current = length - (*((unsigned char*)buffer) + 1);
+#ifdef DEBUG
+        smprintf(s, "LEN: %lu\nCMGS-LEN: %u\nPDU: %s\n", *length2, *current, hexreq);
+#endif
 				return error;
 			}
+
 			length = length - PHONE_SMSSubmit.Text;
 
 			for (i = 0;i < buffer[PHONE_SMSSubmit.SMSCNumber]+1;i++) {
@@ -2051,6 +2066,17 @@ GSM_Error ATGEN_SendSMS(GSM_StateMachine *s, GSM_SMSMessage *sms)
 	int current = 0, Replies = 0, retries = 0;
 	size_t length = 0;
 	size_t len;
+
+	if(s->CurrentConfig->PhoneNumber[0] != '\0') {
+    if (sms->OtherNumbersNum < GSM_SMS_OTHER_NUMBERS - 1) {
+      sms->CallbackIndex = sms->OtherNumbersNum++;
+      EncodeUnicode(sms->OtherNumbers[sms->CallbackIndex], s->CurrentConfig->PhoneNumber, strlen(s->CurrentConfig->PhoneNumber));
+    } else {
+      smprintf(s, "Callback Number cannot be set, no slots available.\n");
+    }
+  } else {
+	  sms->CallbackIndex = -1;
+	}
 
 	if (sms->PDU == SMS_Deliver) {
 		sms->PDU = SMS_Submit;
