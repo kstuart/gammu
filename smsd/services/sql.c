@@ -1392,20 +1392,17 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 					SMSD_Log(DEBUG_NOTICE, Config, "Message: %s", text_decoded);
 					DecodeUTF8(sms->SMS[sms->Number].Text, text_decoded, strlen(text_decoded));
 				}
-			} else {
-				SMSD_Log(DEBUG_NOTICE, Config, "Message: %s", text_decoded);
-				DecodeUTF8(sms->SMS[sms->Number].Text, text_decoded, strlen(text_decoded));
 			}
-		} else {
-			switch (sms->SMS[sms->Number].Coding) {
-				case SMS_Coding_Unicode_No_Compression:
-				case SMS_Coding_Default_No_Compression:
-        case SMS_Coding_ASCII:
-					if (! DecodeHexUnicode(sms->SMS[sms->Number].Text, text, text_len)) {
-						SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
-						return ERR_UNKNOWN;
-					}
-					break;
+			else {
+				switch (sms->SMS[sms->Number].Coding) {
+					case SMS_Coding_Unicode_No_Compression:
+					case SMS_Coding_Default_No_Compression:
+					case SMS_Coding_ASCII:
+						if (! DecodeHexUnicode(sms->SMS[sms->Number].Text, text, text_len)) {
+							SMSD_Log(DEBUG_ERROR, Config, "Failed to decode Text HEX string: %s", text);
+							return ERR_UNKNOWN;
+						}
+						break;
 
 					case SMS_Coding_8bit:
 						if (!DecodeHexBin(sms->SMS[sms->Number].Text, text, text_len)) {
@@ -1586,7 +1583,7 @@ GSM_Error MoveSentMMSParts(GSM_SMSDConfig *Config, long long outbox_id)
 	return error;
 }
 
-GSM_Error SMSDSQL_AddSentMMSInfo(GSM_SMSDConfig *Config, CSTR Coding, CSTR TextDecoded, CSTR MMSHeaders)
+GSM_Error SMSDSQL_AddSentMMSInfo(GSM_SMSDConfig *Config, CSTR Coding, CSTR TextDecoded, CSTR MmsHeaders)
 {
 	GSM_Error error;
 	SQL_result res;
@@ -1623,7 +1620,7 @@ GSM_Error SMSDSQL_AddSentMMSInfo(GSM_SMSDConfig *Config, CSTR Coding, CSTR TextD
 		SB_PutFormattedString(buf, "', \"Status\" = '%s", statusText);
 
 	SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s', \"Coding\" = '%s', \"TextDecoded\" = '%s'  where \"ID\" = %lld;",
-		MMSHeaders, Coding, TextDecoded, Config->MMSSendInfo.outboxID);
+		MmsHeaders, Coding, TextDecoded, Config->MMSSendInfo.outboxID);
 	SB_PutByte(buf, 0);
 
 	error = SMSDSQL_Query(Config, SBBase(buf), &res);
@@ -1706,7 +1703,7 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	int Class = (char)db->GetNumber(Config, &res, 3);
 	CSTR Coding = db->GetString(Config, &res, 1);
 	CSTR TextDecoded = db->GetString(Config, &res, 4);
-	CSTR MMSHeaders = db->GetString(Config, &res, 14);
+	CSTR MmsHeaders = db->GetString(Config, &res, 14);
 
 	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_ADD_SENT_INFO], &sms->SMS[Part - 1], NULL, vars, &r2, FALSE);
 	if (error != ERR_NONE) {
@@ -1716,7 +1713,7 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	db->FreeResult(Config, &r2);
 
 	if(Part == 1 && Class == GSM_CLASS_MMS)
-		SMSDSQL_AddSentMMSInfo(Config, Coding, TextDecoded, MMSHeaders);
+		SMSDSQL_AddSentMMSInfo(Config, Coding, TextDecoded, MmsHeaders);
 
 	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_UPDATE_SENT], &sms->SMS[Part - 1], NULL, NULL, &res, FALSE);
 	if (error != ERR_NONE) {
