@@ -1154,6 +1154,8 @@ void GSM_SetDefaultSMSData(GSM_SMSMessage *SMS)
 	SMS->Memory			= 0;
 	SMS->Folder			= 0x02;	/*Outbox*/
 	SMS->InboxFolder		= FALSE;
+	SMS->CallbackIndex = -1;
+	SMS->Priority = SMS_PRIORITY_NORMAL;
 	GSM_GetCurrentDateTime (&SMS->DateTime);
 	GSM_GetCurrentDateTime (&SMS->SMSCTime);
 }
@@ -1270,6 +1272,14 @@ gboolean GSM_DecodeSiemensOTASMS(GSM_Debug_Info *di, GSM_SiemensOTASMSInfo	*Info
 	return TRUE;
 }
 
+GSM_Coding_Type GSM_NetworkDefaultCoding(GSM_Config *cfg)
+{
+  switch (cfg->NetworkType) {
+    case NETWORK_CDMA: return SMS_Coding_ASCII;
+    default: return SMS_Coding_Default_No_Compression;
+  }
+}
+
 GSM_Coding_Type GSM_StringToSMSCoding(const char *s)
 {
 	/* Maintain those without compression for backward compatibility */
@@ -1289,6 +1299,8 @@ GSM_Coding_Type GSM_StringToSMSCoding(const char *s)
 		return SMS_Coding_Default_Compression;
 	} else if (strcmp("8bit", s) == 0) {
 		return SMS_Coding_8bit;
+  } else if (strcmp("ASCII", s) == 0) {
+    return SMS_Coding_ASCII;
 	}
 
 	return 0;
@@ -1307,11 +1319,13 @@ const char *GSM_SMSCodingToString(GSM_Coding_Type type)
 			return "Default_Compression";
 		case SMS_Coding_8bit:
 			return "8bit";
+	  case SMS_Coding_ASCII:
+	    return "ASCII";
+	  default:
+      return NULL;
 	}
-
-	return NULL;
 }
 
-/* How should editor hadle tabs in this file? Add editor commands here.
+/* How should editor handle tabs in this file? Add editor commands here.
  * vim: noexpandtab sw=8 ts=8 sts=8:
  */

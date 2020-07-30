@@ -13,6 +13,7 @@
 #include <gammu-unicode.h>
 #include <gammu-config.h>
 #include <gammu-misc.h>
+#include <gammu-statemachine.h>
 
 #include "debug.h"
 #include "gsmcomon.h"
@@ -902,6 +903,12 @@ autodetect:
 			return error;
 		}
 
+		error=s->Phone.Functions->SetPower(s, 1);
+		if (error != ERR_NONE && error != ERR_NOTSUPPORTED) {
+			GSM_LogError(s, "Init:Phone->SetPower" , error);
+			return error;
+		}
+
 		error=s->Phone.Functions->PostConnect(s);
 		if (error != ERR_NONE && error != ERR_NOTSUPPORTED) {
 			GSM_LogError(s, "Init:Phone->PostConnect" , error);
@@ -1688,10 +1695,21 @@ GSM_Error GSM_ReadConfig(INI_Section *cfg_info, GSM_Config *cfg, int num)
       goto fail;
   }
 
-	Temp = INI_GetValue(cfg_info, section, "phonenumber", FALSE);
-	if(Temp)
-		strcpy(cfg->PhoneNumber, Temp);
+  Temp = INI_GetValue(cfg_info, section, "networktype", FALSE);
+  if (Temp) {
+    if(strcasecmp(Temp, "cdma") == 0) {
+      cfg->NetworkType = NETWORK_CDMA;
+    } else if(strcasecmp(Temp, "gsm") == 0) {
+      cfg->NetworkType = NETWORK_GSM;
+    } else {
+      cfg->NetworkType = NETWORK_AUTO;
+    }
+  }
 
+  Temp = INI_GetValue(cfg_info, section, "phonenumber", FALSE);
+  if (Temp) {
+    strncpy(cfg->PhoneNumber, Temp, GSM_MAX_NUMBER_LENGTH);
+  }
   return ERR_NONE;
 
 fail:

@@ -7,6 +7,8 @@ project (libGammu C)
 find_package(CURL REQUIRED)
 
 set (LIBRARY_SRC
+    bitstream.c
+    cdma.c
     gsmcomon.c
     gsmphones.c
     gsmstate.c

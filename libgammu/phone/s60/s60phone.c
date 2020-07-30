@@ -1944,6 +1944,7 @@ GSM_Error S60_SendSMS(GSM_StateMachine *s, GSM_SMSMessage *sms)
 			break;
 		case SMS_Coding_Default_No_Compression:
 		case SMS_Coding_Default_Compression:
+		case SMS_Coding_ASCII:
 			strcat(buffer, "7bit");
 			break;
 		case SMS_Coding_8bit:

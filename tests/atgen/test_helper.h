@@ -15,6 +15,8 @@
 #define SET_RESPONSES(responses) \
   set_responses(responses, sizeof(responses) / sizeof(*(responses)))
 
+GSM_Debug_Info *set_debug_info(void);
+
 GSM_StateMachine* setup_state_machine(void);
 GSM_Phone_ATGENData* setup_at_engine(GSM_StateMachine *s);
 void cleanup_state_machine(GSM_StateMachine *s);

@@ -737,7 +737,6 @@ typedef enum {
 	 * Phone does not have a SR memory even if it reports so.
 	 */
 	F_SMS_NO_SR,
-
 	/**
 	 * Just marker of highest feature code, should not be used.
 	 */

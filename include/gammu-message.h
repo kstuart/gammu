@@ -343,8 +343,17 @@ typedef enum {
 	/**
 	 * 8-bit.
 	 */
-	SMS_Coding_8bit
+	SMS_Coding_8bit,
+	/**
+	 * CDMA 7-bit ASCII
+	 */
+	SMS_Coding_ASCII
 } GSM_Coding_Type;
+
+/**
+ * Returns the default encoding of the network
+ */
+GSM_Coding_Type GSM_NetworkDefaultCoding(GSM_Config *cfg);
 
 /**
  * Converts SMS coding to string.
@@ -465,6 +474,18 @@ typedef enum {
 } GSM_SMS_Class;
 
 /**
+ * CDMA SMS Priority
+ *
+ * \ingroup SMS
+ */
+typedef enum  {
+  SMS_PRIORITY_NORMAL = 0,
+  SMS_PRIORITY_INTERACTIVE = 1,
+  SMS_PRIORITY_URGENT = 2,
+  SMS_PRIORITY_EMERGENCY = 3
+} SMS_PRIORITY;
+
+/**
  * SMS message data.
  *
  * \ingroup SMS
@@ -490,6 +511,11 @@ typedef struct {
 	unsigned char
 	 OtherNumbers[GSM_SMS_OTHER_NUMBERS][(GSM_MAX_NUMBER_LENGTH + 1) * 2];
 	int OtherNumbersNum;
+
+	/**
+	 * The index in OtherNumbers of the CDMA Callback if one was provided.
+	 */
+	int CallbackIndex;
 
 	/**
 	 * SMSC (SMS Center)
@@ -564,6 +590,10 @@ typedef struct {
 	 */
 	 gboolean Timeout;
 
+	/*
+	 * CDMA SMS Priority
+	 */
+	SMS_PRIORITY Priority;
 } GSM_SMSMessage;
 
 /* In layouts are saved locations for some SMS part. Below are listed
@@ -1053,6 +1083,7 @@ typedef struct {
 typedef struct {
 	int EntriesNum;
 	gboolean UnicodeCoding;
+	gboolean AsciiCoding;
 	int Class;
 	unsigned char ReplaceMessage;
 	gboolean Unknown;

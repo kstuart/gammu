@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
 
 #include <gammu-unicode.h>
@@ -61,15 +62,21 @@ void GSM_Find_Free_Used_SMS2(GSM_Debug_Info *di, GSM_Coding_Type Coding,GSM_SMSM
 		*FreeBytes = GSM_MAX_8BIT_SMS_LENGTH - SMS->UDH.Length - UsedBytes;
 		*FreeText = *FreeBytes;
 		break;
+  case SMS_Coding_ASCII:
+    *UsedText = UnicodeLength(SMS->Text);
+    UsedBytes = ceil(*UsedText * 7.0 / 8);
+    *FreeBytes = GSM_MAX_8BIT_SMS_LENGTH - ceil(SMS->UDH.Length * 7.0 / 8) - UsedBytes;
+    *FreeText = (size_t)(GSM_MAX_8BIT_SMS_LENGTH - ceil(SMS->UDH.Length * 7.0 / 8)) * 8 / 7 - *UsedText;
+    break;
 	default:
 		break;
 	}
-	smfprintf(di, "UDH len %i, UsedBytes %ld, FreeText %ld, UsedText %ld, FreeBytes %ld\n",
+	smfprintf(di, "UDH Len(%i), UsedBytes(%ld), FreeBytes(%ld), UsedText(%ld), FreeText(%ld)\n",
 		SMS->UDH.Length,
 		(long)UsedBytes,
-		(long)*FreeText,
-		(long)*UsedText,
-		(long)*FreeBytes);
+    (long)*FreeBytes,
+    (long)*UsedText,
+		(long)*FreeText);
 }
 
 unsigned int ReassembleCharacter(char *Buffer, size_t character_index)
@@ -270,7 +277,7 @@ GSM_Error GSM_AddSMS_Text_UDH(GSM_Debug_Info *di,
 		switch (Coding) {
 		case SMS_Coding_Default_No_Compression:
 			FindDefaultAlphabetLen(Buffer,&i,&j,FreeText);
-			smfprintf(di, "Defalt text, length %ld %ld\n", (long)i, (long)j);
+			smfprintf(di, "Default text, length %ld %ld\n", (long)i, (long)j);
 			SMS->SMS[SMS->Number].Text[UnicodeLength(SMS->SMS[SMS->Number].Text)*2+i*2]   = 0;
 			SMS->SMS[SMS->Number].Text[UnicodeLength(SMS->SMS[SMS->Number].Text)*2+i*2+1] = 0;
 			memcpy(SMS->SMS[SMS->Number].Text+UnicodeLength(SMS->SMS[SMS->Number].Text)*2,Buffer,i*2);
@@ -290,7 +297,14 @@ GSM_Error GSM_AddSMS_Text_UDH(GSM_Debug_Info *di,
 			memcpy(SMS->SMS[SMS->Number].Text+SMS->SMS[SMS->Number].Length,Buffer,Copy);
 			SMS->SMS[SMS->Number].Length += Copy;
 			*CopiedText = *CopiedSMSText = Copy;
-			break;
+        break;
+    case SMS_Coding_ASCII:
+      SMS->SMS[SMS->Number].Text[UnicodeLength(SMS->SMS[SMS->Number].Text)*2+Copy*2]   = 0;
+      SMS->SMS[SMS->Number].Text[UnicodeLength(SMS->SMS[SMS->Number].Text)*2+Copy*2+1] = 0;
+      memcpy(SMS->SMS[SMS->Number].Text+UnicodeLength(SMS->SMS[SMS->Number].Text)*2,Buffer,Copy*2);
+      *CopiedText = *CopiedSMSText = Copy;
+      SMS->SMS[SMS->Number].Length += Copy;
+      break;
 		default:
 			break;
 		}
@@ -849,6 +863,9 @@ GSM_Error GSM_EncodeMultiPartSMS(GSM_Debug_Info *di,
 			if (Length > (size_t)(140 - UDHHeader.Length) / 2) {
 				Length = (140 - UDHHeader.Length) / 2;
 			}
+		} else if (Info->AsciiCoding) {
+		  Coding = SMS_Coding_ASCII;
+		  Length = MAX(UnicodeLength(Info->Entries[0].Buffer), 160) - UDHHeader.Length;
 		} else {
 			Coding = SMS_Coding_Default_No_Compression;
 			FindDefaultAlphabetLen(Info->Entries[0].Buffer,&Length,&smslen,(GSM_MAX_8BIT_SMS_LENGTH-UDHHeader.Length)*8/7);
@@ -900,6 +917,16 @@ GSM_Error GSM_EncodeMultiPartSMS(GSM_Debug_Info *di,
 			} else {
 				if (Length>70) UDH=UDH_ConcatenatedMessages;
 			}
+		} else if (Info->AsciiCoding) {
+		  Coding = SMS_Coding_ASCII;
+		  Length = UnicodeLength(Buffer);
+      smslen = ceil((7.0 * Length) / 8);
+      if (Info->Entries[0].ID == SMS_ConcatenatedTextLong16bit ||
+          Info->Entries[0].ID == SMS_ConcatenatedAutoTextLong16bit) {
+        if (smslen>GSM_MAX_SMS_CHARS_LENGTH) UDH=UDH_ConcatenatedMessages16bit;
+      } else {
+        if (smslen>GSM_MAX_SMS_CHARS_LENGTH) UDH=UDH_ConcatenatedMessages;
+      }
 		} else {
 			Coding = SMS_Coding_Default_No_Compression;
 			FindDefaultAlphabetLen(Buffer,&Length,&smslen,5000);
@@ -956,6 +983,7 @@ void GSM_ClearMultiPartSMSInfo(GSM_MultiPartSMSInfo *Info)
 	Info->Class		= -1;
 	Info->ReplaceMessage	= 0;
 	Info->UnicodeCoding	= FALSE;
+	Info->AsciiCoding = FALSE;
 }
 
 void GSM_FreeMultiPartSMSInfo(GSM_MultiPartSMSInfo *Info)

@@ -47,6 +47,8 @@ GSM_Error ALCATEL_ProtocolVersionReply (GSM_Protocol_Message *, GSM_StateMachine
 
 #ifdef GSM_ENABLE_ATOBEX
 #include "../atobex/atobexfunc.h"
+#include "../../cdma.h"
+
 #endif
 
 
@@ -2040,12 +2042,14 @@ GSM_Error ATGEN_GetManufacturer(GSM_StateMachine *s)
 
 	if (Priv->Manufacturer != 0 && s->Phone.Data.Manufacturer[0] != 0) return ERR_NONE;
 
+	strcpy(s->Phone.Data.Manufacturer, "Unknown");
+
 	error = ATGEN_WaitForAutoLen(s, "AT+CGMI\r", 0x00, 40, ID_GetManufacturer);
 
 	if (error != ERR_NONE) {
 		error = ATGEN_WaitForAutoLen(s, "ATI3\r", 0x00, 40, ID_GetManufacturer);
 	}
-	return error;
+	return ERR_NONE;
 }
 
 GSM_Error ATGEN_ReplyGetFirmware(GSM_Protocol_Message *msg, GSM_StateMachine *s)
@@ -2386,6 +2390,13 @@ GSM_Error ATGEN_Initialise(GSM_StateMachine *s)
 
   /* can we use CHUP to hangup calls (otherwise use ATH) */
   ATGEN_WaitForAutoLen(s, "AT+CHUP=?\r", 0x00, 40, ID_CheckCHUP);
+
+  if(s->CurrentConfig->NetworkType == NETWORK_AUTO) {
+    // TODO: [KS] when not determined by configuration then set according to reported network,
+    //  maybe move to ATGEN_GetNetworkInfo
+  }
+
+	smprintf(s, "Network type: %s\n", NetworkTypeToString(s->CurrentConfig->NetworkType));
 
 	s->Protocol.Data.AT.FastWrite = !GSM_IsPhoneFeatureAvailable(s->Phone.Data.ModelInfo, F_SLOWWRITE);
 	s->Protocol.Data.AT.CPINNoOK = GSM_IsPhoneFeatureAvailable(s->Phone.Data.ModelInfo, F_CPIN_NO_OK);

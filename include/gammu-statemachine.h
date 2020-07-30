@@ -41,6 +41,12 @@ typedef struct _GSM_StateMachine GSM_StateMachine;
 
 #include <gammu-info.h>
 
+typedef enum {
+  NETWORK_AUTO = 0,
+  NETWORK_GSM = 1,
+  NETWORK_CDMA = 2
+} NETWORK_TYPE;
+
 /**
  * Configuration of state machine.
  *
@@ -112,10 +118,15 @@ typedef struct {
 	 * AT protocol.
 	 */
 	 int CNMIParams[5];
-	 /**
-	  * The device phone number
-	  */
-	  char PhoneNumber[GSM_MAX_NUMBER_LENGTH + 1];
+  /**
+   * Indicates the standard used by the network, currently
+   * supported options are GSM and CDMA.
+   */
+  NETWORK_TYPE NetworkType;
+  /**
+   * Phone number associated with the device.
+   */
+   char PhoneNumber[GSM_MAX_NUMBER_LENGTH + 1];
 } GSM_Config;
 
 /**
