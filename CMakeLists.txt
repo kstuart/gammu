@@ -443,10 +443,11 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_MINGW OR
         MACRO_TUNE_COMPILER("-Werror")
     endif (NOT GAMMU_VERSION_PATCH LESS 90 OR "$ENV{TRAVIS}" STREQUAL "true")
 
+    set(CMAKE_C_FLAGS_DEBUG "-g3 -Og")
+
     #
     # Warnings related flags
     #
-    MACRO_TUNE_COMPILER("-O2")
     MACRO_TUNE_COMPILER("-Wall")
     MACRO_TUNE_COMPILER("-Werror-implicit-function-declaration")
     MACRO_TUNE_COMPILER("-Wno-deprecated-declarations")
@@ -500,12 +501,9 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_MINGW OR
     #
     # Security related flags
     #
-    if (NOT CLANG_COMPILER)
-        set (ENABLE_PROTECTION ON CACHE BOOL "Enable compile time protections (stack, read only code, fortify in libc...)")
-    endif (NOT CLANG_COMPILER)
+    set (ENABLE_PROTECTION ON CACHE BOOL "Enable compile time protections (stack, read only code, fortify in libc...)")
     if (ENABLE_PROTECTION)
         # Need to enable -O to make fortify work
-        set (CMAKE_C_FLAGS_DEBUG "-g -O")
         add_definitions(-D_FORTIFY_SOURCE=2)
 
         # Text address randomisation, disabled for now, seems to cause problems
