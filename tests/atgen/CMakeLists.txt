@@ -58,3 +58,5 @@ smsd_test(smsd-1-folder-getnextsms)
 atgen_test(at-cdma-pdu-encoder)
 atgen_test(at-cdma-pdu-decoder)
 atgen_test(at-cdma-multipart-ascii)
+
+smsd_test(smsd-survive-truncated-pdu)

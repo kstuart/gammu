@@ -584,6 +584,11 @@ GSM_Error ATGEN_DecodePDUMessage(GSM_StateMachine *s, const char *PDU, const int
       error = GSM_DecodePDUFrame(&(s->di), sms,  buffer, length, &parse_len, TRUE);
 	}
 
+	if (error == ERR_CORRUPTED) {
+		smprintf(s, "PDU appears to be corrupted! Message is probably incorrect!\n");
+		error = ERR_NONE;
+	}
+
 	if (error != ERR_NONE) {
 		free(buffer);
 		return error;

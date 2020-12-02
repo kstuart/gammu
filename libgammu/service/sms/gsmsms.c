@@ -729,8 +729,8 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 		}
 
 		if (pos + datalength >= length) {
-			smfprintf(di, "Ran out of buffer when parsing PDU!\n");
-			return ERR_CORRUPTED;
+			smfprintf(di, "user data is truncated, expected %d octects but got %d!\n", datalength, length - pos - 1);
+			datalength = length - pos - 1;
 		}
 		if (final_pos != NULL) {
 			*final_pos = pos + datalength + 1;
@@ -761,7 +761,7 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 					SMS->Length = 0;
 					break;
 				}
-				GSM_UnpackEightBitsToSeven(w, buffer[pos]-SMS->UDH.Length, SMS->Length, buffer+(pos + 1+SMS->UDH.Length), output);
+				GSM_UnpackEightBitsToSeven(w, buffer[pos]-SMS->UDH.Length, datalength - SMS->UDH.Length, buffer+(pos + 1+SMS->UDH.Length), output);
 				smfprintf(di, "7 bit SMS, length %i\n",SMS->Length);
 				DecodeDefault (SMS->Text, output, SMS->Length, TRUE, NULL);
 				smfprintf(di, "%s\n",DecodeUnicodeString(SMS->Text));
@@ -801,7 +801,10 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 		}
 	}
 
-	return ERR_NONE;
+	if(datalength - SMS->UDH.Length < SMS->Length)
+		return ERR_CORRUPTED;
+	else
+		return ERR_NONE;
 }
 
 GSM_Error GSM_DecodeSMSFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigned char *buffer, GSM_SMSMessageLayout Layout)
