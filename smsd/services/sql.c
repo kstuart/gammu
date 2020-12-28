@@ -1425,13 +1425,13 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 				return ERR_UNKNOWN;
 			}
 			DecodeUTF8(sms->SMS[sms->Number].Number, destination, strlen(destination));
+
+			Config->currdeliveryreport = db->GetBool(Config, &res, 9);
+			if(Config->currdeliveryreport == -1 && strcmp(Config->deliveryreport, "no") != 0)
+				Config->currdeliveryreport = 1;
 		} else {
 			CopyUnicodeString(sms->SMS[sms->Number].Number, sms->SMS[0].Number);
 		}
-
-		Config->currdeliveryreport = db->GetBool(Config, &res, 9);
-		if(Config->currdeliveryreport == -1 && strcmp(Config->deliveryreport, "no") != 0)
-			Config->currdeliveryreport = 1;
 
 		sms->SMS[sms->Number].PDU = Config->currdeliveryreport == 1 ? SMS_Status_Report : SMS_Submit;
 
@@ -1703,7 +1703,7 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	int Class = (char)db->GetNumber(Config, &res, 3);
 	CSTR Coding = db->GetString(Config, &res, 1);
 	CSTR TextDecoded = db->GetString(Config, &res, 4);
-	CSTR MmsHeaders = db->GetString(Config, &res, 14);
+	CSTR MmsHeaders = NULL;
 
 	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_ADD_SENT_INFO], &sms->SMS[Part - 1], NULL, vars, &r2, FALSE);
 	if (error != ERR_NONE) {
@@ -1712,8 +1712,10 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	}
 	db->FreeResult(Config, &r2);
 
-	if(Part == 1 && Class == GSM_CLASS_MMS)
+	if(Part == 1 && Class == GSM_CLASS_MMS) {
+		MmsHeaders = db->GetString(Config, &res, 14);
 		SMSDSQL_AddSentMMSInfo(Config, Coding, TextDecoded, MmsHeaders);
+	}
 
 	error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_UPDATE_SENT], &sms->SMS[Part - 1], NULL, NULL, &res, FALSE);
 	if (error != ERR_NONE) {
