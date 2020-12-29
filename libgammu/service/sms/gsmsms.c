@@ -514,6 +514,7 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 	int i,w;
 	unsigned char	output[161];
 	int			datalength;
+	int septets_received = 0;
 	gboolean have_data = FALSE;
 	GSM_Error error;
 
@@ -761,10 +762,15 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 					SMS->Length = 0;
 					break;
 				}
-				GSM_UnpackEightBitsToSeven(w, buffer[pos]-SMS->UDH.Length, datalength - SMS->UDH.Length, buffer+(pos + 1+SMS->UDH.Length), output);
+
+				septets_received = (datalength - SMS->UDH.Length) * 8 / 7;
+				GSM_UnpackEightBitsToSeven(w, buffer[pos]-SMS->UDH.Length, septets_received, buffer+(pos + 1+SMS->UDH.Length), output);
 				smfprintf(di, "7 bit SMS, length %i\n",SMS->Length);
 				DecodeDefault (SMS->Text, output, SMS->Length, TRUE, NULL);
 				smfprintf(di, "%s\n",DecodeUnicodeString(SMS->Text));
+
+				if(septets_received != SMS->Length)
+					return ERR_CORRUPTED;
 				break;
 			case SMS_Coding_8bit:
 				SMS->Length=buffer[pos] - SMS->UDH.Length;
@@ -801,10 +807,7 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 		}
 	}
 
-	if(datalength - SMS->UDH.Length < SMS->Length)
-		return ERR_CORRUPTED;
-	else
-		return ERR_NONE;
+	return ERR_NONE;
 }
 
 GSM_Error GSM_DecodeSMSFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigned char *buffer, GSM_SMSMessageLayout Layout)
