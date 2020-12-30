@@ -59,4 +59,6 @@ atgen_test(at-cdma-pdu-encoder)
 atgen_test(at-cdma-pdu-decoder)
 atgen_test(at-cdma-multipart-ascii)
 
+atgen_test(gsm-pdu-decoder)
+
 smsd_test(smsd-survive-truncated-pdu)
