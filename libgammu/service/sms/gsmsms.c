@@ -514,7 +514,8 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 	int i,w;
 	unsigned char	output[161];
 	int			datalength;
-	int septets_received = 0;
+	int septets_udh = 0;
+	int septets_capacity = 0;
 	gboolean have_data = FALSE;
 	GSM_Error error;
 
@@ -730,7 +731,7 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 		}
 
 		if (pos + datalength >= length) {
-			smfprintf(di, "user data is truncated, expected %d octects but got %d!\n", datalength, length - pos - 1);
+			smfprintf(di, "user data is truncated, expected %d octects but got %lu!\n", datalength, length - pos - 1);
 			datalength = length - pos - 1;
 		}
 		if (final_pos != NULL) {
@@ -756,20 +757,21 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 					i+=7;
 					w=(i-SMS->UDH.Length)%i;
 				} while (w<0);
-				SMS->Length=buffer[pos] - (SMS->UDH.Length*8 + w) / 7;
+				septets_udh = (SMS->UDH.Length*8 + w) / 7;
+				SMS->Length=buffer[pos] - septets_udh;
 				if (SMS->Length < 0) {
 					smfprintf(di, "No SMS text!\n");
 					SMS->Length = 0;
 					break;
 				}
 
-				septets_received = (datalength - SMS->UDH.Length) * 8 / 7;
-				GSM_UnpackEightBitsToSeven(w, buffer[pos]-SMS->UDH.Length, septets_received, buffer+(pos + 1+SMS->UDH.Length), output);
+				septets_capacity = datalength * 8 / 7 - septets_udh;
+				GSM_UnpackEightBitsToSeven(w, buffer[pos]-SMS->UDH.Length, septets_capacity, buffer + (pos + 1 + SMS->UDH.Length), output);
 				smfprintf(di, "7 bit SMS, length %i\n",SMS->Length);
 				DecodeDefault (SMS->Text, output, SMS->Length, TRUE, NULL);
 				smfprintf(di, "%s\n",DecodeUnicodeString(SMS->Text));
 
-				if(septets_received != SMS->Length)
+				if(septets_capacity < SMS->Length)
 					return ERR_CORRUPTED;
 				break;
 			case SMS_Coding_8bit:
