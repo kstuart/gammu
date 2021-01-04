@@ -1031,6 +1031,24 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 		if (sms->SMS[i].PDU != SMS_Deliver)
 			continue;
 
+		if (i == idx_last) {
+			GSM_MultiPartSMSInfo SMSInfo;
+			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
+				for (int n = 0; n < SMSInfo.EntriesNum; n++) {
+					if (SMSInfo.Entries[n].ID == SMS_MMSIndicatorLong) {
+						if(Config->MMSAutoDownload) {
+							error = MMS_ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
+						}
+						else {
+							sms->SMS[i].Class = GSM_CLASS_MMS;
+							SMSD_Log(DEBUG_INFO, Config, "Not configured to download MMS messages, skipping.");
+						}
+					}
+				}
+				GSM_FreeMultiPartSMSInfo(&SMSInfo);
+			}
+		}
+
 		error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_SAVE_INBOX_SMS_INSERT], &sms->SMS[i], sms, NULL, &res, FALSE);
 		if (error != ERR_NONE) {
 			if (error != ERR_DB_TIMEOUT) {
@@ -1048,23 +1066,6 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			return ERR_UNKNOWN;
 		}
 		SMSD_Log(DEBUG_NOTICE, Config, "Inserted message id %lu", (long)new_id);
-
-		if (i == idx_last) {
-			GSM_MultiPartSMSInfo SMSInfo;
-			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
-				for (int n = 0; n < SMSInfo.EntriesNum; n++) {
-					if (SMSInfo.Entries[n].ID == SMS_MMSIndicatorLong) {
-						if(Config->MMSAutoDownload) {
-							error = MMS_ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
-						}
-						else {
-							SMSD_Log(DEBUG_INFO, Config, "Not configured to download MMS messages, skipping.");
-						}
-					}
-				}
-				GSM_FreeMultiPartSMSInfo(&SMSInfo);
-			}
-		}
 
 		db->FreeResult(Config, &res);
 
