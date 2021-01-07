@@ -1036,11 +1036,12 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
 				for (int n = 0; n < SMSInfo.EntriesNum; n++) {
 					if (SMSInfo.Entries[n].ID == SMS_MMSIndicatorLong) {
+						sms->SMS[i].Class = GSM_CLASS_MMS;
+						EncodeUnicode(sms->SMS[i].Text, "Incoming MMS indicator", 22);
 						if(Config->MMSAutoDownload) {
 							error = MMS_ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
 						}
 						else {
-							sms->SMS[i].Class = GSM_CLASS_MMS;
 							SMSD_Log(DEBUG_INFO, Config, "Not configured to download MMS messages, skipping.");
 						}
 					}
