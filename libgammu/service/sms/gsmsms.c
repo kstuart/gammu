@@ -768,11 +768,16 @@ GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsi
 				septets_capacity = datalength * 8 / 7 - septets_udh;
 				GSM_UnpackEightBitsToSeven(w, buffer[pos]-SMS->UDH.Length, septets_capacity, buffer + (pos + 1 + SMS->UDH.Length), output);
 				smfprintf(di, "7 bit SMS, length %i\n",SMS->Length);
-				DecodeDefault (SMS->Text, output, SMS->Length, TRUE, NULL);
-				smfprintf(di, "%s\n",DecodeUnicodeString(SMS->Text));
 
-				if(septets_capacity < SMS->Length)
+				if(septets_capacity < SMS->Length) {
+					DecodeDefault (SMS->Text, output, septets_capacity, TRUE, NULL);
 					return ERR_CORRUPTED;
+				}
+				else {
+					DecodeDefault (SMS->Text, output, SMS->Length, TRUE, NULL);
+				}
+
+				smfprintf(di, "%s\n",DecodeUnicodeString(SMS->Text));
 				break;
 			case SMS_Coding_8bit:
 				SMS->Length=buffer[pos] - SMS->UDH.Length;

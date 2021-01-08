@@ -1664,6 +1664,7 @@ success:
  */
 gboolean SMSD_ReadDeleteSMS(GSM_SMSDConfig *Config)
 {
+	gboolean success = TRUE;
 	gboolean start;
 	GSM_MultiSMSMessage sms;
 	GSM_MultiSMSMessage **GetSMSData = NULL, **SortedSMS;
@@ -1747,28 +1748,35 @@ gboolean SMSD_ReadDeleteSMS(GSM_SMSDConfig *Config)
 	} else {
 		/* Link messages */
 		error = GSM_LinkSMS(GSM_GetDebug(Config->gsm), GetSMSData, SortedSMS, TRUE);
-		if (error != ERR_NONE) return FALSE;
+		if (error != ERR_NONE)
+			success = FALSE;
 
 		/* Free memory */
-		for (i = 0; GetSMSData[i] != NULL; i++) {
+		for (i = 0; i < GetSMSNumber; i++) {
 			free(GetSMSData[i]);
 			GetSMSData[i] = NULL;
 		}
 		free(GetSMSData);
 	}
 
+	if(success == FALSE) {
+		i = 0;
+		goto cleanupExit;
+	}
+
 	/* Process messages */
 	for (i = 0; SortedSMS[i] != NULL; i++) {
 		/* Check multipart message parts */
 		if (!SMSD_CheckMultipart(Config, SortedSMS[i])) {
-			goto cleanup;
+			goto cleanupLoop;
 		}
 
 		/* Actually process the message */
 		error = SMSD_ProcessSMS(Config, SortedSMS[i]);
 		if (error != ERR_NONE) {
 			SMSD_LogError(DEBUG_INFO, Config, "Error processing SMS", error);
-			return FALSE;
+			success = FALSE;
+			goto cleanupExit;
 		}
 
 		/* Delete processed messages */
@@ -1778,16 +1786,22 @@ gboolean SMSD_ReadDeleteSMS(GSM_SMSDConfig *Config)
 			// Empty error can happen if deleting message several times
 			if (error != ERR_NONE && error != ERR_EMPTY) {
 				SMSD_LogError(DEBUG_INFO, Config, "Error deleting SMS", error);
-				return FALSE;
+				success = FALSE;
+				goto cleanupExit;
 			}
 		}
 
-cleanup:
+cleanupLoop:
 		free(SortedSMS[i]);
 		SortedSMS[i] = NULL;
 	}
+
+cleanupExit:
+	for(; SortedSMS[i] != NULL; i++)
+		free(SortedSMS[i]);
+
 	free(SortedSMS);
-	return TRUE;
+	return success;
 }
 
 /**
