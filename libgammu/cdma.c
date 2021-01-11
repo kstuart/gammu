@@ -14,6 +14,8 @@
 #include <winsock2.h>
 #else
 #include <netinet/in.h>
+#include <math.h>
+
 #endif
 
 int CDMA_Decode7bit(unsigned char *dest, const unsigned char *src, int src_length)
@@ -167,37 +169,42 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
   }
 
   if (udh) {
-    udh_len = *data_ptr + 1;
-    SMS->UDH.Length = udh_len;
-    memcpy(SMS->UDH.Text, data_ptr, SMS->UDH.Length);
-    GSM_DecodeUDHHeader(di, &SMS->UDH);
-    datalength -= udh_len;
+	  udh_len = *data_ptr + 1;
+	  SMS->UDH.Length = udh_len - 1;
+	  memcpy(SMS->UDH.Text, data_ptr, udh_len);
+	  GSM_DecodeUDHHeader(di, &SMS->UDH);
+	  if (encoding == SMS_ENC_GSM) {
+		  int bit_len = udh_len * 8;
+		  if(ceil(bit_len / 7.0) * 7 > bit_len)
+		  	datalength--;
+	  }
+	  datalength -= udh_len;
+	  data_ptr += udh_len;
   }
 
   switch (encoding) {
     case SMS_ENC_ASCII:
       SMS->Coding = SMS_Coding_ASCII;
-      EncodeUnicode(SMS->Text, data_ptr + udh_len, datalength);
+      EncodeUnicode(SMS->Text, data_ptr, datalength);
       SMS->Length = datalength;
       break;
     case SMS_ENC_UNICODE:
       SMS->Coding = SMS_Coding_Unicode_No_Compression;
       SMS->Length = datalength / 2;
-      DecodeUnicodeSpecialNOKIAChars(SMS->Text, data_ptr + udh_len, SMS->Length);
+      DecodeUnicodeSpecialNOKIAChars(SMS->Text, data_ptr, SMS->Length);
       pos += datalength + udh_len;
       break;
     case SMS_ENC_GSM:
       SMS->Coding = SMS_Coding_Default_No_Compression;
-      datalength--;
-      SMS->Length = datalength;
-      DecodeDefault(SMS->Text, data_ptr + udh_len, SMS->Length, TRUE, NULL);
+      DecodeDefault(SMS->Text, data_ptr, datalength, TRUE, NULL);
+		  SMS->Length = UnicodeLength(SMS->Text);
       pos += datalength + udh_len;
       break;
     case SMS_ENC_OCTET:
     case SMS_ENC_LATIN:
       SMS->Coding = SMS_Coding_8bit;
       SMS->Length = datalength;
-      EncodeUnicode(SMS->Text, data_ptr + udh_len, datalength);
+      EncodeUnicode(SMS->Text, data_ptr, datalength);
       pos += datalength + udh_len;
       break;
     default:
