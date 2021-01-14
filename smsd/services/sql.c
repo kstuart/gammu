@@ -508,18 +508,24 @@ static GSM_Error SMSDSQL_NamedQuery(GSM_SMSDConfig * Config, const char *sql_que
 									}
 								}
 								if (to_print == NULL) {
-								       switch (sms->Coding) {
-									       case SMS_Coding_Unicode_No_Compression:
-									       case SMS_Coding_Default_No_Compression:
-									       case SMS_Coding_ASCII:
-									       case SMS_Coding_8bit:
-										       EncodeUTF8(static_buff, sms->Text);
-										       to_print = static_buff;
-										       break;
-									       default:
-										       to_print = "";
-										       break;
-								       }
+									if(sms->Class == GSM_CLASS_MMS) {
+										EncodeUTF8(static_buff, Config->MMSIndicatorMsg);
+										to_print = static_buff;
+									}
+									else {
+										switch (sms->Coding) {
+											case SMS_Coding_Unicode_No_Compression:
+											case SMS_Coding_Default_No_Compression:
+											case SMS_Coding_ASCII:
+											case SMS_Coding_8bit:
+												EncodeUTF8(static_buff, sms->Text);
+												to_print = static_buff;
+												break;
+											default:
+												to_print = "";
+												break;
+										}
+									}
 								}
 							}
 							break;
@@ -1036,7 +1042,6 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			 *(unsigned short*)&sms->SMS[i].UDH.Text[3] == 0x840b)
 		{
 		  sms->SMS[i].Class = GSM_CLASS_MMS;
-	    EncodeUnicode(sms->SMS[i].Text, "Incoming MMS indicator", 22);
 		}
 
 		error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_SAVE_INBOX_SMS_INSERT], &sms->SMS[i], sms, NULL, &res, FALSE);

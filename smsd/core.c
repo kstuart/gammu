@@ -424,6 +424,7 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 	Config->RunOnDataConnect = NULL;
 	Config->MMSCAddress = NULL;
 	Config->MMSCProxy = NULL;
+	EncodeUnicode(Config->MMSIndicatorMsg, "Incoming MMS indicator", 22);
 	Config->MMSAutoDownload = FALSE;
 	Config->smsdcfgfile = NULL;
 	Config->log_handle = NULL;
