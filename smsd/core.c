@@ -424,7 +424,6 @@ GSM_SMSDConfig *SMSD_NewConfig(const char *name)
 	Config->RunOnDataConnect = NULL;
 	Config->MMSCAddress = NULL;
 	Config->MMSCProxy = NULL;
-	EncodeUnicode(Config->MMSIndicatorMsg, "Incoming MMS indicator", 22);
 	Config->MMSAutoDownload = FALSE;
 	Config->smsdcfgfile = NULL;
 	Config->log_handle = NULL;
@@ -1545,6 +1544,16 @@ GSM_Error MMS_ProcessNotificationIndicator(GSM_SMSDConfig *Config, unsigned long
 	return error;
 }
 
+GSM_Error MMS_UpdateInboxMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
+{
+	GSM_Error error = SMSDSQL_UpdateInboxMMSIndicator(Config, inbox_id, MMSIndicator);
+
+	if(error != ERR_NONE) {
+		SMSD_LogError(0, Config, "Failed to update inbox MMS Indicator", error);
+	}
+
+	return error;
+}
 
 GSM_Error MMS_ProcessMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
 {

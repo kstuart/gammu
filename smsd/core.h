@@ -29,6 +29,7 @@
 #define MMS_MESSAGE_TO_SEND (ERR_LAST_VALUE + 1)
 typedef struct _StreamBuffer *SBUFFER;
 GSM_Error SMSD_ProcessServerResponse(GSM_SMSDConfig *Config, SBUFFER RespBuffer);
+GSM_Error MMS_UpdateInboxMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator);
 
 typedef enum {
 	SMSD_LOG_NONE,
@@ -99,7 +100,6 @@ struct _GSM_SMSDConfig {
 	const char *RunOnDataConnect; /* run this command to start/stop mobile data connection (PPP) */
 	const char *MMSCAddress; /* MMS Service Provider (MMSC) http address */
 	const char *MMSCProxy; /* MMS Service Provider Proxy URL */
-	const char MMSIndicatorMsg[46]; /* Unicode text to insert into Inbox on MMS Indicator */
   gboolean MMSAutoDownload; /* TRUE to download MMS messages */
 	gboolean checksecurity;
 	gboolean hangupcalls;

@@ -508,24 +508,18 @@ static GSM_Error SMSDSQL_NamedQuery(GSM_SMSDConfig * Config, const char *sql_que
 									}
 								}
 								if (to_print == NULL) {
-									if(sms->Class == GSM_CLASS_MMS) {
-										EncodeUTF8(static_buff, Config->MMSIndicatorMsg);
-										to_print = static_buff;
-									}
-									else {
-										switch (sms->Coding) {
-											case SMS_Coding_Unicode_No_Compression:
-											case SMS_Coding_Default_No_Compression:
-											case SMS_Coding_ASCII:
-											case SMS_Coding_8bit:
-												EncodeUTF8(static_buff, sms->Text);
-												to_print = static_buff;
-												break;
-											default:
-												to_print = "";
-												break;
-										}
-									}
+								       switch (sms->Coding) {
+									       case SMS_Coding_Unicode_No_Compression:
+									       case SMS_Coding_Default_No_Compression:
+									       case SMS_Coding_ASCII:
+									       case SMS_Coding_8bit:
+										       EncodeUTF8(static_buff, sms->Text);
+										       to_print = static_buff;
+										       break;
+									       default:
+										       to_print = "";
+										       break;
+								       }
 								}
 							}
 							break;
@@ -811,6 +805,38 @@ GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MM
 	return ERR_NONE;
 }
 
+GSM_Error SMSDSQL_UpdateInboxMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator)
+{
+	GSM_Error error;
+	SQL_result result;
+	GSM_SMS_Class class;
+	const char *text;
+	char buf[256];
+
+	switch(MMSIndicator->MessageType) {
+		default:
+			class = GSM_MMS_UNSUPPORTED;
+			text = "Unsupported MMS Indicator";
+			break;
+		case M_NOTIFICATION_IND:
+			class = GSM_MMS_NOTIFICATION;
+			text = "Incoming MMS Indicator";
+			break;
+		case M_DELIVERY_IND:
+			class = GSM_MMS_REPORT;
+			text = "MMS Delivery Report";
+			break;
+	}
+
+	sprintf(buf, "update inbox set \"Class\" = %d, \"TextDecoded\" = '%s' where \"ID\" = %llu;", class, text, inbox_id);
+	error = SMSDSQL_Query(Config, buf, &result);
+
+  if(error == ERR_NONE)
+	  Config->db->FreeResult(Config, &result);
+
+  return error;
+}
+
 GSM_Error SMSDSQL_SaveReportMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator)
 {
 	GSM_Error error;
@@ -886,8 +912,7 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 	}
 
 	SMSD_Log(DEBUG_INFO, Config, "InboxID(%llu)", inbox_id);
-	SB_PutFormattedString(buf, "update inbox set \"Class\" = %d, \"Status\" = %d, \"SenderNumber\" = '%s' where \"ID\" = %llu;",
-		GSM_CLASS_MMS,
+	SB_PutFormattedString(buf, "update inbox set \"Status\" = %d, \"SenderNumber\" = '%s' where \"ID\" = %llu;",
 		Config->StatusCode,
 		sender ? sender : "Not Provided",
 		inbox_id);
@@ -1037,13 +1062,6 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 		if (sms->SMS[i].PDU != SMS_Deliver)
 			continue;
 
-		if(i == idx_last &&
-			 sms->SMS[i].UDH.Type == UDH_UserUDH &&
-			 *(unsigned short*)&sms->SMS[i].UDH.Text[3] == 0x840b)
-		{
-		  sms->SMS[i].Class = GSM_CLASS_MMS;
-		}
-
 		error = SMSDSQL_NamedQuery(Config, Config->SMSDSQL_queries[SQL_QUERY_SAVE_INBOX_SMS_INSERT], &sms->SMS[i], sms, NULL, &res, FALSE);
 		if (error != ERR_NONE) {
 			if (error != ERR_DB_TIMEOUT) {
@@ -1067,6 +1085,7 @@ static GSM_Error SMSDSQL_SaveInboxSMS(GSM_MultiSMSMessage * sms, GSM_SMSDConfig 
 			if (GSM_DecodeMultiPartSMS(GSM_GetDebug(Config->gsm), &SMSInfo, sms, TRUE)) {
 				for (int n = 0; n < SMSInfo.EntriesNum; n++) {
 					if (SMSInfo.Entries[n].ID == SMS_MMSIndicatorLong) {
+						MMS_UpdateInboxMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
 						if(Config->MMSAutoDownload) {
 							error = MMS_ProcessMMSIndicator(Config, new_id, SMSInfo.Entries[0].MMSIndicator);
 						}
@@ -1396,7 +1415,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 			}
 		}
 
-		if (Class != GSM_CLASS_MMS) {
+		if (Class != GSM_MMS_NOTIFICATION) {
 			if (text == NULL || text_len == 0) {
 				if (text_decoded == NULL) {
 					SMSD_Log(DEBUG_ERROR, Config, "Message without text!");
@@ -1448,7 +1467,7 @@ GSM_Error SMSDSQL_PrepareOutboxMMS(GSM_SMSDConfig *Config, long outbox_id, const
 
 		sms->SMS[sms->Number].PDU = Config->currdeliveryreport == 1 ? SMS_Status_Report : SMS_Submit;
 
-		if(i == 1 &&  Class == GSM_CLASS_MMS) {
+		if(i == 1 &&  Class == GSM_MMS_NOTIFICATION) {
 			mms_headers = db->GetString(Config, &res, 14);
 			error = SMSDSQL_PrepareOutboxMMS(Config, outbox_id, destination, mms_headers, Config->MMSBuffer);
 			if(error != ERR_NONE && error != ERR_EMPTY) {
@@ -1725,7 +1744,7 @@ static GSM_Error SMSDSQL_AddSentSMSInfo(GSM_MultiSMSMessage * sms, GSM_SMSDConfi
 	}
 	db->FreeResult(Config, &r2);
 
-	if(Part == 1 && Class == GSM_CLASS_MMS) {
+	if(Part == 1 && Class == GSM_MMS_NOTIFICATION) {
 		MmsHeaders = db->GetString(Config, &res, 14);
 		SMSDSQL_AddSentMMSInfo(Config, Coding, TextDecoded, MmsHeaders);
 	}

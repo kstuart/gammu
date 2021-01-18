@@ -24,6 +24,7 @@ time_t SMSDSQL_ParseDate(GSM_SMSDConfig * Config, const char *date);
  */
 GSM_Error SMSDSQL_UpdateDeliveryStatusMMS(GSM_SMSDConfig *Config, CSTR msgid, MMSStatus status, time_t ts);
 GSM_Error SMSDSQL_SaveReportMMS(GSM_SMSDConfig *Config, GSM_MMSIndicator *MMSIndicator);
+GSM_Error SMSDSQL_UpdateInboxMMSIndicator(GSM_SMSDConfig *Config, unsigned long long inbox_id, GSM_MMSIndicator *MMSIndicator);
 #endif
 
 /* How should editor hadle tabs in this file? Add editor commands here.
