@@ -12,6 +12,7 @@
 #define _XOPEN_SOURCE
 #define _BSD_SOURCE
 #define _DEFAULT_SOURCE
+#define _POSIX_C_SOURCE 200809L
 #include <time.h>
 #include <gammu.h>
 #include "../../libgammu/misc/strptime.h"
