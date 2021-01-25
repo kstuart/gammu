@@ -913,9 +913,9 @@ GSM_Error SaveInboxMMS(GSM_SMSDConfig *Config, MMSMESSAGE mms, unsigned long lon
 	}
 
 	SMSD_Log(DEBUG_INFO, Config, "InboxID(%llu)", inbox_id);
-	SB_PutFormattedString(buf, "update inbox set \"Status\" = %d, \"SenderNumber\" = '%s' where \"ID\" = %llu;",
+	SB_PutFormattedString(buf, "update inbox set \"Status\" = %d, \"SenderNumber\" = %s where \"ID\" = %llu;",
 		Config->StatusCode,
-		sender ? sender : "Not Provided",
+		sender ? Config->db->QuoteString(Config, sender) : "Not Provided",
 		inbox_id);
 	SB_PutByte(buf, 0);
 	free(sender);
@@ -1652,8 +1652,8 @@ GSM_Error SMSDSQL_AddSentMMSInfo(GSM_SMSDConfig *Config, CSTR Coding, CSTR TextD
 	if(statusText)
 		SB_PutFormattedString(buf, "', \"Status\" = '%s", statusText);
 
-	SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s', \"Coding\" = '%s', \"TextDecoded\" = '%s'  where \"ID\" = %lld;",
-		MmsHeaders, Coding, TextDecoded, Config->MMSSendInfo.outboxID);
+	SB_PutFormattedString(buf, "', \"MMSHeaders\" = '%s', \"Coding\" = '%s', \"TextDecoded\" = %s  where \"ID\" = %lld;",
+		MmsHeaders, Coding, Config->db->QuoteString(Config, TextDecoded), Config->MMSSendInfo.outboxID);
 	SB_PutByte(buf, 0);
 
 	error = SMSDSQL_Query(Config, SBBase(buf), &res);
