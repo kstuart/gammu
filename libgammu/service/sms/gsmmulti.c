@@ -1809,6 +1809,34 @@ GSM_Error GSM_LinkSMS(GSM_Debug_Info *di, GSM_MultiSMSMessage **InputMessages, G
 			i = 0;
 			continue;
 		}
+
+		// linked SMS part numbers should be in range 1..TotalParts (AllParts)
+		// if the index is invalid processing is skipped.
+		if(InputMessages[i]->SMS[0].UDH.PartNumber < 1 ||
+			 InputMessages[i]->SMS[0].UDH.PartNumber > InputMessages[i]->SMS[0].UDH.AllParts)
+		{
+			smfprintf(di, "Skipping message %d with invalid index (reports part %d of %d)\n",
+			          InputMessages[i]->SMS[0].Location,
+			          InputMessages[i]->SMS[0].UDH.PartNumber,
+			          InputMessages[i]->SMS[0].UDH.AllParts);
+
+			OutputMessages[OutputMessagesNum] = (GSM_MultiSMSMessage *)malloc(sizeof(GSM_MultiSMSMessage));
+			if (OutputMessages[OutputMessagesNum] == NULL) {
+				free(InputMessagesSorted);
+				InputMessagesSorted=NULL;
+				return ERR_MOREMEMORY;
+			}
+
+			memcpy(&OutputMessages[OutputMessagesNum]->SMS[0],&InputMessages[i]->SMS[0],sizeof(GSM_SMSMessage));
+			OutputMessages[OutputMessagesNum]->Processed = TRUE;
+			OutputMessages[OutputMessagesNum]->Number = 1;
+			OutputMessages[OutputMessagesNum+1] = NULL;
+
+			i++;
+			OutputMessagesNum++;
+			continue;
+		}
+
 		/* We have 1'st part of linked sms. It's single.
 		 * We will try to find other parts
 		 */

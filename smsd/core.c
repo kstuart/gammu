@@ -1776,17 +1776,19 @@ gboolean SMSD_ReadDeleteSMS(GSM_SMSDConfig *Config)
 
 	/* Process messages */
 	for (i = 0; SortedSMS[i] != NULL; i++) {
-		/* Check multipart message parts */
-		if (!SMSD_CheckMultipart(Config, SortedSMS[i])) {
-			goto cleanupLoop;
-		}
+		if(SortedSMS[i]->Processed == FALSE) {
+			/* Check multipart message parts */
+			if (!SMSD_CheckMultipart(Config, SortedSMS[i])) {
+				goto cleanupLoop;
+			}
 
-		/* Actually process the message */
-		error = SMSD_ProcessSMS(Config, SortedSMS[i]);
-		if (error != ERR_NONE) {
-			SMSD_LogError(DEBUG_INFO, Config, "Error processing SMS", error);
-			success = FALSE;
-			goto cleanupExit;
+			/* Actually process the message */
+			error = SMSD_ProcessSMS(Config, SortedSMS[i]);
+			if (error != ERR_NONE) {
+				SMSD_LogError(DEBUG_INFO, Config, "Error processing SMS", error);
+				success = FALSE;
+				goto cleanupExit;
+			}
 		}
 
 		/* Delete processed messages */
