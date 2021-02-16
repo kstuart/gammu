@@ -1419,6 +1419,7 @@ GSM_Error ATGEN_GetNextSMS(GSM_StateMachine *s, GSM_MultiSMSMessage *sms, gboole
 		if (Priv->SMSCache != NULL) {
 			sms->SMS[0].Folder = 0;
 			sms->Number = 1;
+			sms->Processed = FALSE;
 			sms->SMS[0].Memory = Priv->SMSMemory;
 			sms->SMS[0].Location = Priv->SMSCache[found].Location;
 
