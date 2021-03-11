@@ -33,6 +33,31 @@ void decode_pdu_ascii(void)
   test_result(strcmp("aaaaaaaaaabbbbbbbbbb", DecodeUnicodeString(sms.Text)) == 0);
 }
 
+void decode_pdu_ascii_2(void)
+{
+	GSM_Error error;
+	GSM_Debug_Info *di = set_debug_info();
+	GSM_SMSMessage sms;
+	unsigned char pdu[BUFFSIZE] = { 0 };
+	size_t pos = 0;
+
+	const char *pdu_hex = "098110514294453190F621030313543910020002001691A5053E997B655883A68D3CD069E6820ECCBE00";
+	const size_t pdu_len_hex = strlen(pdu_hex);
+	const size_t pdu_len = pdu_len_hex / 2;
+
+	puts(__func__);
+
+	sms.State = SMS_UnRead;
+	test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
+	error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
+
+	test_result(error == ERR_NONE);
+	test_result(pos == pdu_len);
+	test_result(sms.Length == 22);
+	test_result(sms.Coding == SMS_Coding_ASCII);
+	test_result(strcmp("Hi Steve, this is Alex", DecodeUnicodeString(sms.Text)) == 0);
+}
+
 void decode_pdu_gsm(void)
 {
 	GSM_Error error;
@@ -56,6 +81,32 @@ void decode_pdu_gsm(void)
 	test_result(sms.Length == 31);
 	test_result(sms.Coding == SMS_Coding_Default_No_Compression);
 	test_result(strcmp("Hooray!  It's working ???[]{}#%", DecodeUnicodeString(sms.Text)) == 0);
+}
+
+void decode_pdu_gsm_2(void)
+{
+	GSM_Error error;
+	GSM_Debug_Info *di = set_debug_info();
+	GSM_SMSMessage sms;
+	unsigned char pdu[BUFFSIZE] = { 0 };
+	size_t pos = 0;
+
+	const char *pdu_hex = "0781090008002610210303131637100500090138050003940202E8BDDACEDE3E47EA72760F4DA7C3E7BAD7CBDE3EBBECFABB6BFC6EBFACCD63B2397D599BD3B2DC9E1E97E7";
+	const size_t pdu_len_hex = strlen(pdu_hex);
+	const size_t pdu_len = pdu_len_hex / 2;
+
+	puts(__func__);
+
+	sms.State = SMS_UnRead;
+	test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
+	error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
+
+	test_result(error == ERR_NONE);
+	test_result(pos == pdu_len);
+	test_result(sms.Length == 49);
+	test_result(sms.Coding == SMS_Coding_Default_No_Compression);
+	test_result(sms.UDH.PartNumber == 2);
+	test_result(strcmp("t=5;vmg_url=https://vmg.vzw.com/VMGIMS/VMServices", DecodeUnicodeString(sms.Text)) == 0);
 }
 
 void decode_pdu_unicode(void)
@@ -113,6 +164,31 @@ void decode_pdu_latin_1(void)
   test_result(strcmp("Feck off", DecodeUnicodeString(sms.Text)) == 0);
 }
 
+void decode_pdu_latin_2(void)
+{
+	GSM_Error error;
+	GSM_Debug_Info *di = set_debug_info();
+	GSM_SMSMessage sms;
+	unsigned char pdu[BUFFSIZE] = { 0 };
+	size_t pos = 0;
+
+	const char *pdu_hex = "0681077458307221030408013410020008000E576879206E6F20616E7377657220";
+	const size_t pdu_len_hex = strlen(pdu_hex);
+	const size_t pdu_len = pdu_len_hex / 2;
+
+	puts(__func__);
+
+	sms.State = SMS_UnRead;
+	test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
+	error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
+
+	test_result(error == ERR_NONE);
+	test_result(pos == pdu_len);
+	test_result(sms.Length == 14);
+	test_result(sms.Coding == SMS_Coding_8bit);
+	test_result(strcmp("Why no answer ", DecodeUnicodeString(sms.Text)) == 0);
+}
+
 void decode_pdu_octet(void)
 {
   GSM_Error error;
@@ -139,141 +215,14 @@ void decode_pdu_octet(void)
 
 }
 
-void decode_pdu_ascii_multi(void)
-{
-  GSM_Error error;
-  GSM_Debug_Info *di = set_debug_info();
-  GSM_SMSMessage sms;
-  unsigned char pdu[BUFFSIZE] = { 0 };
-  size_t pos = 0;
-
-  const char *pdu_hex = "08810001689095286119061207474010050002011A0A001DF02070E1C3870E1C3870E1C58B162C58B162C588";
-	const size_t pdu_len_hex = strlen(pdu_hex);
-	const size_t pdu_len = pdu_len_hex / 2;
-
-  puts(__func__);
-
-  sms.State = SMS_UnRead;
-  test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
-  error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
-
-	test_result(error == ERR_NONE);
-  test_result(sms.UDH.Type == UDH_ConcatenatedMessages);
-  test_result(sms.UDH.ID8bit == 95);
-  test_result(sms.UDH.ID16bit == -1);
-  test_result(sms.UDH.AllParts == 1);
-  test_result(sms.UDH.PartNumber == 1);
-  test_result(pos == pdu_len);
-  test_result(sms.Length == 20);
-  test_result(sms.Coding == SMS_Coding_ASCII);
-  test_result(strcmp("aaaaaaaaaabbbbbbbbbb", DecodeUnicodeString(sms.Text)) == 0);
-}
-
-void decode_pdu_gsm_multi(void)
-{
-  GSM_Error error;
-  GSM_Debug_Info *di = set_debug_info();
-  GSM_SMSMessage sms;
-  unsigned char pdu[BUFFSIZE] = { 0 };
-  size_t pos = 0;
-
-  const char *pdu_hex = "0881000168909528611906120747401005000901180500035F02024646464646464646464646464646414141";
-	const size_t pdu_len_hex = strlen(pdu_hex);
-	const size_t pdu_len = pdu_len_hex / 2;
-
-  puts(__func__);
-
-  sms.State = SMS_UnRead;
-  test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
-  error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
-
-	test_result(error == ERR_NONE);
-  test_result(sms.UDH.Type == UDH_ConcatenatedMessages);
-  test_result(sms.UDH.ID8bit == 95);
-  test_result(sms.UDH.ID16bit == -1);
-  test_result(sms.UDH.AllParts == 2);
-  test_result(sms.UDH.PartNumber == 2);
-  test_result(pos == pdu_len);
-  test_result(sms.Length == 17);
-  test_result(sms.Coding == SMS_Coding_Default_No_Compression);
-  test_result(strcmp(
-    "FFFFFFFFFFFFFFAAA",
-    DecodeUnicodeString(sms.Text)) == 0);
-}
-
-void decode_pdu_unicode_multi(void)
-{
-  GSM_Error error;
-  GSM_Debug_Info *di = set_debug_info();
-  GSM_SMSMessage sms;
-  unsigned char pdu[BUFFSIZE] = { 0 };
-  size_t pos = 0;
-
-  const char *pdu_hex = "0881000100035443F219061207474010050004014E0500036B0303004100410041004100410041004100410041004100410041004100410041004100410041004100460046004600460046004600460046004600460046004600460046004100410041";
-	const size_t pdu_len_hex = strlen(pdu_hex);
-	const size_t pdu_len = pdu_len_hex / 2;
-
-  puts(__func__);
-
-  sms.State = SMS_UnRead;
-  test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
-  error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
-
-	test_result(error == ERR_NONE);
-  test_result(sms.UDH.Type == UDH_ConcatenatedMessages);
-  test_result(sms.UDH.ID8bit == 107);
-  test_result(sms.UDH.ID16bit == -1);
-  test_result(sms.UDH.AllParts == 3);
-  test_result(sms.UDH.PartNumber == 3);
-  test_result(pos == pdu_len);
-  test_result(sms.Length == 36);
-  test_result(sms.Coding == SMS_Coding_Unicode_No_Compression);
-  test_result(strcmp( "AAAAAAAAAAAAAAAAAAAFFFFFFFFFFFFFFAAA", DecodeUnicodeString(sms.Text)) == 0);
-}
-
-void decode_pdu_octet_multi(void)
-{
-  GSM_Error error;
-  GSM_Debug_Info *di = set_debug_info();
-  GSM_SMSMessage sms;
-  unsigned char pdu[BUFFSIZE] = { 0 };
-  size_t pos = 0;
-
-  const char *pdu_hex = "0881100068909528611906120747401005000001760500035F02014C6F72656D20697073756D20646F6C6F722073697420616D65742C20636F6E73656374657475722061646970697363696E6720656C69742E204E756C6C616D2061207175616D20717569732075726E61206469676E697373696D206C616F726565742065742071756973206F7263692E";
-	const size_t pdu_len_hex = strlen(pdu_hex);
-	const size_t pdu_len = pdu_len_hex / 2;
-
-  puts(__func__);
-
-  sms.State = SMS_UnRead;
-  test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
-  error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
-
-	test_result(error == ERR_NONE);
-  test_result(sms.UDH.Type == UDH_ConcatenatedMessages);
-  test_result(sms.UDH.ID8bit == 95);
-  test_result(sms.UDH.ID16bit == -1);
-  test_result(sms.UDH.AllParts == 2);
-  test_result(sms.UDH.PartNumber == 1);
-  test_result(pos == pdu_len);
-  test_result(sms.Length == 112);
-  test_result(sms.Coding == SMS_Coding_8bit);
-  test_result(strcmp(
-   "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam a quam quis urna dignissim laoreet et quis orci.",
-    DecodeUnicodeString(sms.Text)) == 0);
-}
-
-
 int main(void)
 {
-  decode_pdu_ascii();
+	decode_pdu_ascii();
+	decode_pdu_ascii_2();
   decode_pdu_latin_1();
+  decode_pdu_latin_2();
 	decode_pdu_gsm();
+	decode_pdu_gsm_2();
   decode_pdu_unicode();
   decode_pdu_octet();
-
-  decode_pdu_ascii_multi();
-	decode_pdu_gsm_multi();
-  decode_pdu_unicode_multi();
-  decode_pdu_octet_multi();
 }

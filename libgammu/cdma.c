@@ -101,130 +101,141 @@ GSM_Error ATCDMA_DecodeSMSDateTime(GSM_Debug_Info *di, GSM_DateTime *DT, const u
   return ERR_NONE;
 }
 
+size_t ATCDMA_DecodeGSM(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *data, int datalength, unsigned char *output)
+{
+	int septets_capacity, septets_udh = 0;
+	int count, w = 0, i = 0;
+	const unsigned char *data_ptr = data + 1;
+
+	SMS->Coding = SMS_Coding_Default_No_Compression;
+
+	if(SMS->UDH.Length > 0) {
+		do {
+			i += 7;
+			w = (i - SMS->UDH.Length) % i;
+		} while (w < 0);
+
+		septets_udh = (SMS->UDH.Length * 8 + w) / 7;
+		SMS->Length = *data - septets_udh;
+	}
+
+	septets_capacity = datalength - septets_udh;
+
+	if(septets_udh > 0) {
+		GSM_UnpackEightBitsToSeven(w, *data - SMS->UDH.Length, septets_capacity, data + SMS->UDH.Length + 1, output);
+		data_ptr = output;
+	}
+
+	count = DecodeDefault(SMS->Text, data_ptr, septets_capacity, TRUE, NULL);
+
+	SMS->Length = UnicodeLength(SMS->Text);
+	smfprintf(di, "7 bit SMS, length %i\n",SMS->Length);
+
+	return septets_udh > 0 ? ceil(count * 7.0 / 8) : count;
+}
+
 GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *buffer, size_t length, size_t *final_pos)
 {
-  int udh = 0;
-  size_t pos = 0;
-  int datalength = 0;
-  int udh_len = 0;
-  unsigned char output[512] = { 0 };
-  const unsigned char *data_ptr = NULL;
-  SMS_ENCODING encoding;
-  GSM_Error error;
+	size_t pos = 0;
+	int udh, datalength;
+	SMS_ENCODING encoding;
+	unsigned char output[161];
+	const unsigned char *data_ptr;
+	GSM_Error error;
 
-  GSM_SetDefaultReceivedSMSData(SMS);
+	GSM_SetDefaultReceivedSMSData(SMS);
 
-  if (SMS->State == SMS_Read || SMS->State == SMS_UnRead) {
-    smfprintf(di, "SMS type: Deliver\n");
-    SMS->PDU = SMS_Deliver;
-  } else {
-    smfprintf(di, "SMS type: Submit\n");
-    SMS->PDU = SMS_Submit;
-  }
+	if (SMS->State == SMS_Read || SMS->State == SMS_UnRead) {
+		smfprintf(di, "SMS type: Deliver\n");
+		SMS->PDU = SMS_Deliver;
+	} else {
+		smfprintf(di, "SMS type: Submit\n");
+		SMS->PDU = SMS_Submit;
+	}
 
-  error = GSM_UnpackSemiOctetNumber(di, SMS->Number, buffer, &pos, length, FALSE);
-  if (error != ERR_NONE)
-    return error;
+	error = GSM_UnpackSemiOctetNumber(di, SMS->Number, buffer, &pos, length, FALSE);
+	if (error != ERR_NONE)
+		return error;
 
-  if (SMS->PDU == SMS_Submit) {
-    error = GSM_UnpackSemiOctetNumber(di, SMS->OtherNumbers[0], buffer, &pos, length, FALSE);
-    if (error != ERR_NONE)
-      return error;
+	if (SMS->PDU == SMS_Submit) {
+		error = GSM_UnpackSemiOctetNumber(di, SMS->OtherNumbers[0], buffer, &pos, length, FALSE);
+		if (error != ERR_NONE)
+			return error;
 
-    smfprintf(di, "Destination Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
-    smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[0]));
-  } else {
-    smfprintf(di, "Originating Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
-  }
+		smfprintf(di, "Destination Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
+		smfprintf(di, "Callback Address: \"%s\"\n", DecodeUnicodeString(SMS->OtherNumbers[0]));
+	} else {
+		smfprintf(di, "Originating Address: \"%s\"\n", DecodeUnicodeString(SMS->Number));
+	}
 
-  if (SMS->PDU == SMS_Deliver) {
-    error = ATCDMA_DecodeSMSDateTime(di, &SMS->DateTime, buffer + pos);
-    pos += 6;
-    if (error != ERR_NONE)
-      return error;
-  }
+	if (SMS->PDU == SMS_Deliver) {
+		error = ATCDMA_DecodeSMSDateTime(di, &SMS->DateTime, buffer + pos);
+		pos += 6;
+		if (error != ERR_NONE)
+			return error;
+	}
 
-  error = CDMA_CheckTeleserviceID(di, buffer + pos, 2);
-  pos += 2;
-  if (error != ERR_NONE)
-    return error;
+	error = CDMA_CheckTeleserviceID(di, buffer + pos, 2);
+	pos += 2;
+	if (error != ERR_NONE)
+		return error;
 
-  SMS->Priority = buffer[pos++];
-  smfprintf(di, "Priority: [%d] %s\n", SMS->Priority, CDMA_SMSPriorityToString(SMS->Priority));
+	SMS->Priority = buffer[pos++];
+	smfprintf(di, "Priority: [%d] %s\n", SMS->Priority, CDMA_SMSPriorityToString(SMS->Priority));
 
-  encoding = buffer[pos++];
-  smfprintf(di, "Encoding: [%d] %s\n", encoding, CDMA_SMSEncodingToString(encoding));
+	encoding = buffer[pos++];
+	smfprintf(di, "Encoding: [%d] %s\n", encoding, CDMA_SMSEncodingToString(encoding));
 
-  udh = buffer[pos++];
-  smfprintf(di, "UDH Present: %s\n", udh == 0 ? "No" : "Yes");
+	udh = buffer[pos++];
+	smfprintf(di, "UDH Present: %s\n", udh == 0 ? "No" : "Yes");
 
-  datalength = buffer[pos++];
-  smfprintf(di, "Data length: %d\n", datalength);
+	datalength = buffer[pos];
+	smfprintf(di, "Data length: %d\n", datalength);
 
-  if(encoding == SMS_ENC_ASCII) {
-    pos += CDMA_Decode7bit(output, buffer + pos,  datalength);
-    data_ptr = output;
-  } else {
-    data_ptr = buffer + pos;
-  }
+	if(udh) {
+		SMS->UDH.Length = buffer[pos + 1] + 1;
+		smfprintf(di, "UDH header available (length %i)\n",SMS->UDH.Length);
+		memcpy(SMS->UDH.Text, buffer + pos + 1, SMS->UDH.Length);
+		GSM_DecodeUDHHeader(di, &SMS->UDH);
+	}
 
-  if (udh) {
-	  udh_len = *data_ptr + 1;
-	  SMS->UDH.Length = udh_len - 1;
-	  memcpy(SMS->UDH.Text, data_ptr, udh_len);
-	  GSM_DecodeUDHHeader(di, &SMS->UDH);
-	  if (encoding == SMS_ENC_GSM) {
-		  int bit_len = udh_len * 8;
-		  if(ceil(bit_len / 7.0) * 7 > bit_len)
-		  	datalength--;
-	  }
-	  datalength -= udh_len;
-	  data_ptr += udh_len;
-  }
+	data_ptr = buffer + pos + SMS->UDH.Length + 1;
 
-  switch (encoding) {
-    case SMS_ENC_ASCII:
-      SMS->Coding = SMS_Coding_ASCII;
-      EncodeUnicode(SMS->Text, data_ptr, datalength);
-      SMS->Length = datalength;
-      break;
-    case SMS_ENC_UNICODE:
-      SMS->Coding = SMS_Coding_Unicode_No_Compression;
-      SMS->Length = datalength / 2;
-      DecodeUnicodeSpecialNOKIAChars(SMS->Text, data_ptr, SMS->Length);
-      pos += datalength + udh_len;
-      break;
-    case SMS_ENC_GSM:
-      SMS->Coding = SMS_Coding_Default_No_Compression;
-      DecodeDefault(SMS->Text, data_ptr, datalength, TRUE, NULL);
-		  SMS->Length = UnicodeLength(SMS->Text);
-      pos += datalength + udh_len;
-      break;
-    case SMS_ENC_OCTET:
-    case SMS_ENC_LATIN:
-      SMS->Coding = SMS_Coding_8bit;
-      SMS->Length = datalength;
-      EncodeUnicode(SMS->Text, data_ptr, datalength);
-      pos += datalength + udh_len;
-      break;
-    default:
-      smfprintf(di, "Unsupported encoding.\n");
-      error = ERR_ABORTED;
-  }
+	switch(encoding) {
+		case SMS_ENC_ASCII:
+			SMS->Coding = SMS_Coding_ASCII;
+			pos += CDMA_Decode7bit(output, data_ptr, datalength) + 1;
+			EncodeUnicode(SMS->Text, output, datalength);
+			SMS->Length = datalength;
+			DumpMessage(di, SMS->Text, SMS->Length * 2);
+			break;
+		case SMS_ENC_UNICODE:
+			SMS->Coding = SMS_Coding_Unicode_No_Compression;
+			SMS->Length = datalength / 2;
+			DecodeUnicodeSpecialNOKIAChars(SMS->Text, data_ptr, SMS->Length);
+			pos += datalength + SMS->UDH.Length + 1;
+			break;
+		case SMS_ENC_GSM:
+			pos += ATCDMA_DecodeGSM(di, SMS, buffer + pos, datalength, output) + SMS->UDH.Length + 1;
+			break;
+		case SMS_ENC_OCTET:
+		case SMS_ENC_LATIN:
+			SMS->Coding = SMS_Coding_8bit;
+			SMS->Length = datalength;
+			EncodeUnicode(SMS->Text, data_ptr, datalength);
+			pos += datalength + SMS->UDH.Length + 1;
+			DumpMessage(di, SMS->Text, SMS->Length * 2);
+			break;
+		default:
+			smfprintf(di, "Unsupported encoding.\n");
+			error = ERR_ABORTED;
 
-  if (error != ERR_NONE)
-    return error;
+	}
 
-#ifdef DEBUG
-  smfprintf(di, "SMS length %i\n",SMS->Length);
-  DumpMessageText(di, SMS->Text, SMS->Length * 2);
-  smfprintf(di, "%s\n", DecodeUnicodeString(SMS->Text));
-#endif
+	if(final_pos)
+		*final_pos = pos;
 
-  if (final_pos)
-    *final_pos = pos;
-
-  return error;
+	return error;
 }
 
 GSM_Error ATCDMA_EncodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, unsigned char *buffer, int *length)

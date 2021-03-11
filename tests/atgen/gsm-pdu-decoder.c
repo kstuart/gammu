@@ -1,7 +1,5 @@
 #include "test_helper.h"
 
-GSM_Error GSM_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *buffer, size_t length, size_t *final_pos, gboolean SMSC);
-
 #define BUFFSIZE 1024
 
 int main(void)

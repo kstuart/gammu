@@ -531,7 +531,7 @@ static unsigned char GSM_DefaultAlphabetCharsExtension[][3] =
 	{0x00,0x00,0x00}
 };
 
-void DecodeDefault (unsigned char *dest, const unsigned char *src, size_t len, gboolean UseExtensions, unsigned char *ExtraAlphabet)
+int DecodeDefault (unsigned char *dest, const unsigned char *src, size_t len, gboolean UseExtensions, unsigned char *ExtraAlphabet)
 {
 	size_t 	pos, current = 0, i;
 
@@ -575,6 +575,8 @@ void DecodeDefault (unsigned char *dest, const unsigned char *src, size_t len, g
 #ifdef DEBUG
 	DumpMessageText(&GSM_global_debug, dest, UnicodeLength(dest)*2);
 #endif
+
+	return pos;
 }
 
 /* There are many national chars with "adds". In phone they're normally
