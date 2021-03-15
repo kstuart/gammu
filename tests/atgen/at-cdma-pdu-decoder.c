@@ -109,6 +109,32 @@ void decode_pdu_gsm_2(void)
 	test_result(strcmp("t=5;vmg_url=https://vmg.vzw.com/VMGIMS/VMServices", DecodeUnicodeString(sms.Text)) == 0);
 }
 
+void decode_pdu_gsm_3(void)
+{
+	GSM_Error error;
+	GSM_Debug_Info *di = set_debug_info();
+	GSM_SMSMessage sms;
+	unsigned char pdu[BUFFSIZE] = { 0 };
+	size_t pos = 0;
+
+	const char *pdu_hex = "068113291455552103110823281005000901A0050003C00201416C6C3A2020746869732069732061206C6F6E67207465737420726573756C7473204920616D2074656C6C696E6720616E6420636865636B20616C206C6F74206F662070656F706C65206265666F7265207468697320616E6420696620697420646964206E6F7420776F726B204269676C65722062646179206868682049646B207768617420746F20736179206275742077652077696C6C20";
+	const size_t pdu_len_hex = strlen(pdu_hex);
+	const size_t pdu_len = pdu_len_hex / 2;
+
+	puts(__func__);
+
+	sms.State = SMS_UnRead;
+	test_result(DecodeHexBin(pdu, pdu_hex, pdu_len_hex));
+	error = ATCDMA_DecodePDUFrame(di, &sms, pdu, pdu_len, &pos);
+
+	test_result(error == ERR_NONE);
+	test_result(pos == pdu_len);
+	test_result(sms.Length == 153);
+	test_result(sms.Coding == SMS_Coding_Default_No_Compression);
+	test_result(strcmp("All:  this is a long test results I am telling and check al lot of people before this and if it did not work Bigler bday hhh Idk what to say but we will "
+		 , DecodeUnicodeString(sms.Text)) == 0);
+}
+
 void decode_pdu_unicode(void)
 {
   GSM_Error error;
@@ -223,6 +249,7 @@ int main(void)
   decode_pdu_latin_2();
 	decode_pdu_gsm();
 	decode_pdu_gsm_2();
-  decode_pdu_unicode();
+	decode_pdu_gsm_3();
+	decode_pdu_unicode();
   decode_pdu_octet();
 }

@@ -101,7 +101,7 @@ GSM_Error ATCDMA_DecodeSMSDateTime(GSM_Debug_Info *di, GSM_DateTime *DT, const u
   return ERR_NONE;
 }
 
-size_t ATCDMA_DecodeGSM(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *data, int datalength, unsigned char *output)
+size_t ATCDMA_DecodeGSM(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *data, int len_data, size_t len_octets, unsigned char *output)
 {
 	int septets_capacity, septets_udh = 0;
 	int count, w = 0, i = 0;
@@ -116,12 +116,21 @@ size_t ATCDMA_DecodeGSM(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned 
 		} while (w < 0);
 
 		septets_udh = (SMS->UDH.Length * 8 + w) / 7;
-		SMS->Length = *data - septets_udh;
+		data_ptr += septets_udh - 1;
 	}
 
-	septets_capacity = datalength - septets_udh;
+	i = (int)len_octets * 8 / 7 - 1;
+	septets_capacity = len_data - septets_udh;
 
-	if(septets_udh > 0) {
+	if(i != len_data) {
+		smfprintf(di, "SMS claims data length %d septets but actual length is %d\n", len_data, i);
+		smfprintf(di, "%s\n",  i > len_data ?
+			"ignoring extra data as likely erroneous." :
+			"actual message is likely truncated.");
+
+	}
+
+	if(i == len_data && septets_udh > 0) {
 		GSM_UnpackEightBitsToSeven(w, *data - SMS->UDH.Length, septets_capacity, data + SMS->UDH.Length + 1, output);
 		data_ptr = output;
 	}
@@ -129,9 +138,9 @@ size_t ATCDMA_DecodeGSM(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned 
 	count = DecodeDefault(SMS->Text, data_ptr, septets_capacity, TRUE, NULL);
 
 	SMS->Length = UnicodeLength(SMS->Text);
-	smfprintf(di, "7 bit SMS, length %i\n",SMS->Length);
+	smfprintf(di, "7 bit SMS, length %i, decoded %d\n", SMS->Length, count);
 
-	return septets_udh > 0 ? ceil(count * 7.0 / 8) : count;
+	return len_octets;
 }
 
 GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned char *buffer, size_t length, size_t *final_pos)
@@ -139,7 +148,7 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
 	size_t pos = 0;
 	int udh, datalength;
 	SMS_ENCODING encoding;
-	unsigned char output[161];
+	unsigned char output[512];
 	const unsigned char *data_ptr;
 	GSM_Error error;
 
@@ -216,7 +225,7 @@ GSM_Error ATCDMA_DecodePDUFrame(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const u
 			pos += datalength + SMS->UDH.Length + 1;
 			break;
 		case SMS_ENC_GSM:
-			pos += ATCDMA_DecodeGSM(di, SMS, buffer + pos, datalength, output) + SMS->UDH.Length + 1;
+			pos += ATCDMA_DecodeGSM(di, SMS, buffer + pos, datalength, length - pos, output);
 			break;
 		case SMS_ENC_OCTET:
 		case SMS_ENC_LATIN:
