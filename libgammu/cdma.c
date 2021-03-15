@@ -124,10 +124,7 @@ size_t ATCDMA_DecodeGSM(GSM_Debug_Info *di, GSM_SMSMessage *SMS, const unsigned 
 
 	if(i != len_data) {
 		smfprintf(di, "SMS claims data length %d septets but actual length is %d\n", len_data, i);
-		smfprintf(di, "%s\n",  i > len_data ?
-			"ignoring extra data as likely erroneous." :
-			"actual message is likely truncated.");
-
+		smfprintf(di, "-- treating the message data as CDMA unpacked GSM-7\n");
 	}
 
 	if(i == len_data && septets_udh > 0) {
